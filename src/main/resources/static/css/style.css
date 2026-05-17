@@ -911,3 +911,18 @@ a { text-decoration: none; color: inherit; }
 .star-rating-10 .star-icon:hover ~ .star-icon {
     /* reset */
 }
+
+/* ========================
+   История просмотров
+   ======================== */
+.history-date-label {
+    color: var(--text-secondary, #ccc);
+    font-size: 1rem;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: 0.5rem;
+}
+
+.history-group .films-grid {
+    margin-top: 0.75rem;
+}

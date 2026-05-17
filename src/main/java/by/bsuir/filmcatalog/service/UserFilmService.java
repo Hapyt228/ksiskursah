@@ -73,11 +73,17 @@ public class UserFilmService {
     @Transactional(readOnly = true)
     public List<FilmDto> getViewHistory(String username) {
         User user = findUserOrThrow(username);
+        // Один фильм может появляться несколько раз — берём только последний запись для каждого
+        Set<Long> seen = new LinkedHashSet<>();
         return viewHistoryRepository.findByUserOrderByViewedAtDesc(user)
                 .stream()
-                .map(h -> toDto(h.getFilm()))
-                .distinct()
+                .filter(h -> seen.add(h.getFilm().getId())) // дедупликация: первый встреченный = последний по времени
                 .limit(50)
+                .map(h -> {
+                    FilmDto dto = toDto(h.getFilm());
+                    dto.setViewedAt(h.getViewedAt()); // передаём дату просмотра
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -132,7 +138,7 @@ public class UserFilmService {
      * Поставить или обновить оценку фильма (1-5 звёзд).
      */
     public void rateFilm(String username, Long filmId, Integer stars) {
-        if (stars < 1 || stars > 5) throw new IllegalArgumentException("Оценка от 1 до 5");
+        if (stars < 1 || stars > 10) throw new IllegalArgumentException("Оценка от 1 до 10");
 
         User user = findUserOrThrow(username);
         Film film = filmRepository.findById(filmId)

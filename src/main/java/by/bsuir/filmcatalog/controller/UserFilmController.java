@@ -127,8 +127,8 @@ public class UserFilmController {
             @RequestBody Map<String, Object> body,
             Authentication auth) {
         Integer stars = (Integer) body.get("stars");
-        if (stars == null || stars < 1 || stars > 5) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 5"));
+        if (stars == null || stars < 1 || stars > 10) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 10"));
         }
         Long localId = userFilmService.resolveOrCreateLocalFilm(tmdbId, extractFilmDto(body));
         userFilmService.rateFilm(auth.getName(), localId, stars);
@@ -245,8 +245,8 @@ public class UserFilmController {
                                       @RequestBody Map<String, Integer> body,
                                       Authentication auth) {
         Integer stars = body.get("stars");
-        if (stars == null || stars < 1 || stars > 5) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 5"));
+        if (stars == null || stars < 1 || stars > 10) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 10"));
         }
         userFilmService.rateFilm(auth.getName(), id, stars);
         return ResponseEntity.ok(Map.of("stars", stars));

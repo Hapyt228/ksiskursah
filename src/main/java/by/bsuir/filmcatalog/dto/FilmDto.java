@@ -1,6 +1,7 @@
 package by.bsuir.filmcatalog.dto;
 
 import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 
 /**
  * DTO (Data Transfer Object) для передачи данных о фильме через REST API.
@@ -47,6 +48,9 @@ public class FilmDto {
     private String language;
 
     private String tags;
+
+    /** Дата последнего просмотра (только в ответах истории) */
+    private LocalDateTime viewedAt;
 
     // ========================
     // Конструкторы
@@ -99,4 +103,7 @@ public class FilmDto {
 
     public String getTags() { return tags; }
     public void setTags(String tags) { this.tags = tags; }
+
+    public LocalDateTime getViewedAt() { return viewedAt; }
+    public void setViewedAt(LocalDateTime viewedAt) { this.viewedAt = viewedAt; }
 }

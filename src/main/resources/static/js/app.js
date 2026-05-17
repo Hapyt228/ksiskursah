@@ -61,7 +61,7 @@ async function loadAllFilms() {
     if (isLoading) return;
     isLoading = true;
     showLoading(true);
-    resetFiltersUI();
+    // НЕ сбрасываем значения фильтров при переключении вида
 
     try {
         // Параллельно запрашиваем страницы 1, 2, 3 → 60 фильмов сразу
@@ -108,18 +108,21 @@ async function loadTopFilms() {
     const container = document.getElementById('topFilmsContainer');
     if (container) container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-accent"></div></div>`;
     try {
-        // Загружаем 5 страниц параллельно, сортируем по рейтингу
-        // Используем реальный TMDb top_rated endpoint — уже отсортирован по рейтингу
-        const pages = await Promise.all([1,2,3,4,5].map(p => apiFetch(`${API_TMDB}/top_rated?page=${p}`)));
+        // Используем реальный TMDb top_rated endpoint.
+        // Загружаем 15 страниц (300 фильмов) — обеспечивает порядочное покрытие фильмов с 9+
+        const pages = await Promise.all(
+            Array.from({length: 15}, (_, i) => i + 1)
+                 .map(p => apiFetch(`${API_TMDB}/top_rated?page=${p}`))
+        );
         const films = pages.flat().filter(Boolean);
-        // Убираем дубликаты (на случай пересечений между страницами)
+        // Убираем дубликаты
         const seen = new Set();
         const top = films.filter(f => {
             const key = f.tmdbId || f.id;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
-        }).slice(0, 100);
+        }).slice(0, 250);
         renderFilmsWithRank(top, 'topFilmsContainer');
     } catch (e) {
         if (container) container.innerHTML = errorHtml('Ошибка загрузки. Проверьте TMDb API ключ.');
@@ -127,15 +130,67 @@ async function loadTopFilms() {
 }
 
 async function loadHistory() {
+    const container = document.getElementById('historyContainer');
     if (!Auth.isLoggedIn()) {
-        document.getElementById('historyContainer').innerHTML = errorHtml('Войдите, чтобы видеть историю просмотров');
+        container.innerHTML = errorHtml('Войдите, чтобы видеть историю просмотров');
         return;
     }
+    container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-accent"></div></div>`;
     try {
         const res = await Auth.authFetch(`${API_USER}/history`);
+        if (!res.ok) { container.innerHTML = errorHtml('Ошибка загрузки истории'); return; }
         const films = await res.json();
-        renderFilms(films, 'historyContainer');
-    } catch (_) {}
+        if (!films.length) {
+            container.innerHTML = errorHtml('История пуста — откройте любой фильм');
+            return;
+        }
+        renderHistoryGrouped(films, 'historyContainer');
+    } catch (_) {
+        container.innerHTML = errorHtml('Ошибка загрузки истории');
+    }
+}
+
+// Рендер истории с группировкой по датам
+function renderHistoryGrouped(films, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Группируем фильмы по дате просмотра
+    const groups = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    films.forEach(f => {
+        let label;
+        if (f.viewedAt) {
+            const d = new Date(f.viewedAt);
+            d.setHours(0, 0, 0, 0);
+            if (d.getTime() === today.getTime()) label = 'Сегодня';
+            else if (d.getTime() === yesterday.getTime()) label = 'Вчера';
+            else label = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+        } else {
+            label = 'Раньше';
+        }
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(f);
+    });
+
+    let html = '';
+    for (const [label, groupFilms] of Object.entries(groups)) {
+        html += `
+            <div class="history-group mb-5">
+                <h5 class="history-date-label mb-3">
+                    <i class="bi bi-calendar3 me-2 text-accent"></i>${escapeHtml(label)}
+                    <span class="badge bg-secondary ms-2">${groupFilms.length}</span>
+                </h5>
+                <div class="films-grid">
+                    ${groupFilms.map((f, i) => filmCardHtml(f, i)).join('')}
+                </div>
+            </div>`;
+    }
+    container.innerHTML = html;
 }
 
 // ========================
@@ -159,7 +214,7 @@ async function loadFilters() {
 }
 
 function resetFiltersUI() {
-    ['filterGenre','filterYearFrom','filterYearTo','filterRating','filterCountry']
+    ['filterGenre','filterYearFrom','filterYearTo','filterRating']
         .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 }
 
@@ -168,6 +223,19 @@ async function applyFilters() {
     const yearFrom = document.getElementById('filterYearFrom')?.value;
     const yearTo   = document.getElementById('filterYearTo')?.value;
     const rating   = document.getElementById('filterRating')?.value;
+    const currentYear = new Date().getFullYear();
+
+    // Валидация года
+    if (yearFrom && parseInt(yearFrom) > currentYear) {
+        showToast(`Год ОТ не может быть больше ${currentYear}`, 'error');
+        document.getElementById('filterYearFrom').value = currentYear;
+        return;
+    }
+    if (yearTo && parseInt(yearTo) > currentYear) {
+        showToast(`Год ДО не может быть больше ${currentYear}`, 'error');
+        document.getElementById('filterYearTo').value = currentYear;
+        return;
+    }
 
     const hasFilter = genre || yearFrom || yearTo || rating;
     if (!hasFilter) {
@@ -238,6 +306,13 @@ function handleHeroSearch(e) {
 }
 
 async function performSearch(query) {
+    // Запоминаем страницу, с которой идёт поиск
+    const visiblePage = ['catalog','search','top','history'].find(p => {
+        const el = document.getElementById(`page-${p}`);
+        return el && !el.classList.contains('d-none');
+    });
+    if (visiblePage && visiblePage !== 'search') previousPage = visiblePage;
+
     // Переключаем на страницу поиска сразу
     document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
     document.getElementById('page-search')?.classList.remove('d-none');

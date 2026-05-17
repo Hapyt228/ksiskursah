@@ -107,11 +107,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-medium">Год от</label>
-                    <input type="number" class="form-control" id="filterYearFrom" placeholder="1900" min="1888" max="2100" onchange="applyFilters()">
+                    <input type="number" class="form-control" id="filterYearFrom" placeholder="1900" min="1888" onchange="applyFilters()">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-medium">Год до</label>
-                    <input type="number" class="form-control" id="filterYearTo" placeholder="2026" min="1888" max="2100" onchange="applyFilters()">
+                    <input type="number" class="form-control" id="filterYearTo" placeholder="2026" min="1888" onchange="applyFilters()">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-medium">Рейтинг от</label>
@@ -123,13 +123,8 @@
                         <option value="6">6+</option>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-medium">Страна</label>
-                    <select class="form-select" id="filterCountry" onchange="applyFilters()">
-                        <option value="">Все страны</option>
-                    </select>
-                </div>
                 <div class="col-md-1">
+                    <label class="form-label fw-medium d-block">&nbsp;</label>
                     <button class="btn btn-outline-secondary w-100" onclick="resetFilters()" title="Сбросить">
                         <i class="bi bi-x-circle"></i>
                     </button>
@@ -194,7 +189,7 @@
 <div id="page-search" class="page d-none">
     <div class="container py-5">
         <div class="d-flex align-items-center gap-3 mb-4">
-            <button class="btn btn-outline-secondary btn-sm" onclick="showPage('catalog')"><i class="bi bi-arrow-left"></i> Назад</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="showPage(previousPage)"><i class="bi bi-arrow-left"></i> Назад</button>
             <h4 class="mb-0">Результаты: <span id="searchQueryLabel" class="text-accent"></span></h4>
         </div>
         <div id="searchResultsContainer" class="films-grid"></div>
