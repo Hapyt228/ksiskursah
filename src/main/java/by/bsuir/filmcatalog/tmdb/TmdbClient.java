@@ -219,10 +219,18 @@ public class TmdbClient {
             return webClient.get()
                     .uri(u -> {
                         var b = u.path("/discover/movie")
-                                .queryParam("sort_by", "vote_average.desc")
-                                .queryParam("vote_count.gte", "100")
                                 .queryParam("language", language)
                                 .queryParam("page", page);
+                        // vote_count.gte: при фильтре по рейтингу 9+ — минимальный порог (10 голосов),
+                        // чтобы новые фильмы (2025-2026) попадали в выдачу.
+                        // Без фильтра рейтинга — стандартный порог 200 для качественных результатов.
+                        if (voteAverageGte != null && voteAverageGte >= 8.5) {
+                            b = b.queryParam("vote_count.gte", "10")
+                                 .queryParam("sort_by", "vote_average.desc");
+                        } else {
+                            b = b.queryParam("vote_count.gte", "200")
+                                 .queryParam("sort_by", "vote_average.desc");
+                        }
                         if (genreId != null)        b = b.queryParam("with_genres", genreId);
                         if (yearFrom != null)        b = b.queryParam("primary_release_date.gte", yearFrom + "-01-01");
                         if (yearTo   != null)        b = b.queryParam("primary_release_date.lte", yearTo   + "-12-31");

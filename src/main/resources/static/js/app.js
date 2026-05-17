@@ -108,21 +108,33 @@ async function loadTopFilms() {
     const container = document.getElementById('topFilmsContainer');
     if (container) container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-accent"></div></div>`;
     try {
-        // Используем реальный TMDb top_rated endpoint.
-        // Загружаем 15 страниц (300 фильмов) — обеспечивает порядочное покрытие фильмов с 9+
-        const pages = await Promise.all(
-            Array.from({length: 15}, (_, i) => i + 1)
-                 .map(p => apiFetch(`${API_TMDB}/top_rated?page=${p}`))
-        );
-        const films = pages.flat().filter(Boolean);
-        // Убираем дубликаты
+        // Используем два источника параллельно:
+        // 1) /movie/top_rated  — классический топ (фильмы с множеством голосов и высоким рейтингом)
+        // 2) /discover         — новые фильмы с 8.5+ без жёсткого порога голосов
+        const [topRatedPages, discoverPages] = await Promise.all([
+            Promise.all(
+                Array.from({length: 10}, (_, i) => i + 1)
+                     .map(p => apiFetch(`${API_TMDB}/top_rated?page=${p}`))
+            ),
+            Promise.all(
+                Array.from({length: 5}, (_, i) => i + 1)
+                     .map(p => apiFetch(`${API_TMDB}/discover?rating=8.5&page=${p}`))
+            )
+        ]);
+
+        const allRaw = [...topRatedPages.flat(), ...discoverPages.flat()].filter(Boolean);
+
+        // Убираем дубликаты, сортируем по рейтингу убывающе
         const seen = new Set();
-        const top = films.filter(f => {
-            const key = f.tmdbId || f.id;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        }).slice(0, 250);
+        const top = allRaw
+            .filter(f => {
+                const key = f.tmdbId || f.id;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 250);
         renderFilmsWithRank(top, 'topFilmsContainer');
     } catch (e) {
         if (container) container.innerHTML = errorHtml('Ошибка загрузки. Проверьте TMDb API ключ.');
@@ -658,7 +670,21 @@ function setView(view) {
     currentView = view;
     document.getElementById('btnGrid')?.classList.toggle('active', view === 'grid');
     document.getElementById('btnList')?.classList.toggle('active', view === 'list');
-    if (allFilms.length) renderFilms(allFilms, 'filmsContainer');
+
+    // Если есть активные фильтры — перерисовываем фильтрованные результаты;
+    // если фильтров нет — показываем все загруженные фильмы
+    const genre    = document.getElementById('filterGenre')?.value;
+    const yearFrom = document.getElementById('filterYearFrom')?.value;
+    const yearTo   = document.getElementById('filterYearTo')?.value;
+    const rating   = document.getElementById('filterRating')?.value;
+    const hasFilter = genre || yearFrom || yearTo || rating;
+
+    if (hasFilter) {
+        // есть активные фильтры — повторно применить их
+        applyFilters();
+    } else if (allFilms.length) {
+        renderFilms(allFilms, 'filmsContainer');
+    }
 }
 
 // ========================
