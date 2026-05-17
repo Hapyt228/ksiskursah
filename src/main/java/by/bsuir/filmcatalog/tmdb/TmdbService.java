@@ -112,22 +112,88 @@ public class TmdbService {
     }
 
     /**
-     * Фильмы определённого жанра с пагинацией (для эндпоинта /api/tmdb/discover).
-     * @param tmdbGenreId  ID жанра в TMDb
-     * @param page         страница (1-500)
+     * Универсальный Discover с опциональными фильтрами (для /api/tmdb/discover).
      */
-    public List<FilmDto> discoverByGenre(Integer tmdbGenreId, int page) {
-        TmdbPageResponse response = client.discoverByGenre(tmdbGenreId, page);
+    public List<FilmDto> discover(Integer genreId, Integer yearFrom, Integer yearTo,
+                                  Double voteAverageGte, int page) {
+        TmdbPageResponse response = client.discover(genreId, yearFrom, yearTo, voteAverageGte, page);
         return convertList(response);
     }
 
     /**
+     * Устаревший метод — оставлен для совместимости.
+     */
+    public List<FilmDto> discoverByGenre(Integer tmdbGenreId, int page) {
+        return discover(tmdbGenreId, null, null, null, page);
+    }
+
+    /**
+     * Рекомендации на основе списка tmdbGenreId из истории просмотров пользователя.
+     * Спрашивает TMDb Discover API, исключает уже посмотренные фильмы.
+     *
+     * @param topGenreIds  список TMDb genre_id (до 3 штук)
+     * @param excludeTmdbIds фильмы которые уже смотрел пользователь
+     * @param limit        макс. количество результатов
+     */
+    public List<FilmDto> getRecommendationsByGenreIds(List<Integer> topGenreIds,
+                                                       java.util.Set<Long> excludeTmdbIds,
+                                                       int limit) {
+        if (topGenreIds == null || topGenreIds.isEmpty()) {
+            // Если жанров нет — возвращаем популярные с TMDb
+            return convertList(client.discover(null, null, null, null, 1))
+                    .stream().limit(limit).collect(Collectors.toList());
+        }
+
+        java.util.Set<Long> seen = new java.util.LinkedHashSet<>();
+        List<FilmDto> result = new java.util.ArrayList<>();
+
+        // Проходимся по каждому жанру из топов
+        for (Integer genreId : topGenreIds) {
+            if (result.size() >= limit) break;
+            List<FilmDto> candidates = convertList(client.discoverByGenre(genreId, 1));
+            for (FilmDto f : candidates) {
+                if (result.size() >= limit) break;
+                Long tid = f.getTmdbId();
+                if (tid != null && !excludeTmdbIds.contains(tid) && seen.add(tid)) {
+                    result.add(f);
+                }
+            }
+        }
+
+        // Добираем до limit если не хватило
+        if (result.size() < limit) {
+            List<FilmDto> popular = convertList(client.discover(null, null, null, null, 1));
+            for (FilmDto f : popular) {
+                if (result.size() >= limit) break;
+                Long tid = f.getTmdbId();
+                if (tid != null && !excludeTmdbIds.contains(tid) && seen.add(tid)) {
+                    result.add(f);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
      * Разрешает имя жанра по TMDb genre_id.
-     * Используется при конвертации списков (где есть только genre_ids).
      */
     public String resolveGenreName(Integer genreId) {
         if (genreCache.isEmpty()) warmupGenreCache();
         return genreCache.getOrDefault(genreId, "Прочее");
+    }
+
+    /**
+     * Обратный поиск: находит TMDb genre_id по русскому имени жанра.
+     * Используется в getRecommendations для перевода имени жанра в id.
+     */
+    public Integer resolveGenreIdByName(String name) {
+        if (genreCache.isEmpty()) warmupGenreCache();
+        if (name == null) return null;
+        return genreCache.entrySet().stream()
+                .filter(e -> e.getValue().equalsIgnoreCase(name.trim()))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
     }
 
     // ========================

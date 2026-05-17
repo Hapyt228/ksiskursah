@@ -177,73 +177,62 @@ public class UserFilmService {
     public List<FilmDto> getRecommendations(String username, int limit) {
         User user = findUserOrThrow(username);
 
-        // Шаг 1: веса жанров из статусов
+        // Шаг 1: веса жанров — собираем genre строки (они же хранят имя жанра из TMDb)
         Map<String, Double> genreWeights = new LinkedHashMap<>();
 
         statusRepository.findWeightedGenresByUser(user).forEach(row -> {
             String genre = (String) row[0];
             double weight = ((Number) row[1]).doubleValue();
-            genreWeights.merge(genre, weight, Double::sum);
+            if (genre != null) genreWeights.merge(genre, weight, Double::sum);
         });
 
-        // Шаг 2: добавляем веса из оценок
         ratingRepository.findWeightedGenresByRating(user).forEach(row -> {
             String genre = (String) row[0];
             double weight = ((Number) row[1]).doubleValue();
-            genreWeights.merge(genre, weight, Double::sum);
+            if (genre != null) genreWeights.merge(genre, weight, Double::sum);
         });
 
-        // Шаг 3: добавляем вес из истории просмотров (вес 0.5 за каждый просмотр)
         viewHistoryRepository.findByUserOrderByViewedAtDesc(user).stream()
             .limit(100)
-            .forEach(h -> genreWeights.merge(h.getFilm().getGenre(), 0.5, Double::sum));
+            .forEach(h -> {
+                if (h.getFilm().getGenre() != null)
+                    genreWeights.merge(h.getFilm().getGenre(), 0.5, Double::sum);
+            });
 
-        // Если у пользователя вообще нет данных — топ по рейтингу
+        // Шаг 2: tmdbId уже посмотренных (чтобы не повторяться)
+        Set<Long> seenTmdbIds = new HashSet<>();
+        viewHistoryRepository.findViewedFilmIdsByUser(user).forEach(localId ->
+            filmRepository.findById(localId).ifPresent(f -> {
+                if (f.getTmdbId() != null) seenTmdbIds.add(f.getTmdbId());
+            })
+        );
+        statusRepository.findFilmIdsByUser(user).forEach(localId ->
+            filmRepository.findById(localId).ifPresent(f -> {
+                if (f.getTmdbId() != null) seenTmdbIds.add(f.getTmdbId());
+            })
+        );
+
+        // Шаг 3: если истории нет — популярные из TMDb
         if (genreWeights.isEmpty()) {
-            return filmRepository.findTopRated(limit).stream()
-                    .map(this::toDto)
-                    .collect(Collectors.toList());
+            return tmdbService.getRecommendationsByGenreIds(
+                    Collections.emptyList(), seenTmdbIds, limit);
         }
 
-        // Шаг 4: топ-3 жанра по суммарному весу
-        List<String> topGenres = genreWeights.entrySet().stream()
+        // Шаг 4: топ-3 жанра по весу → переводим в TMDb genre_id
+        List<String> topGenreNames = genreWeights.entrySet().stream()
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                 .limit(3)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
-        // Шаг 5: уже виденные film_id (по статусам + истории)
-        Set<Long> seenIds = new HashSet<>();
-        seenIds.addAll(statusRepository.findFilmIdsByUser(user));
-        seenIds.addAll(viewHistoryRepository.findViewedFilmIdsByUser(user));
-
-        // Шаг 6: все фильмы из любимых жанров, которых пользователь не видел
-        List<Film> allCandidates = filmRepository.findAll().stream()
-                .filter(f -> !seenIds.contains(f.getId()))
-                .filter(f -> topGenres.contains(f.getGenre()))
+        // Находим TMDb genre_id по имени жанра
+        List<Integer> topGenreIds = topGenreNames.stream()
+                .map(name -> tmdbService.resolveGenreIdByName(name))
+                .filter(id -> id != null)
                 .collect(Collectors.toList());
 
-        // Шаг 7: сортируем — сначала по позиции жанра в topGenres, потом по рейтингу
-        Map<String, Integer> genreRank = new HashMap<>();
-        for (int i = 0; i < topGenres.size(); i++) genreRank.put(topGenres.get(i), i);
-
-        allCandidates.sort(Comparator
-                .comparingInt((Film f) -> genreRank.getOrDefault(f.getGenre(), 99))
-                .thenComparingDouble(f -> -(f.getRating() != null ? f.getRating() : 0)));
-
-        // Если кандидатов мало — добиваем топ по рейтингу
-        if (allCandidates.size() < limit) {
-            List<Film> topFilled = filmRepository.findTopRated(limit * 2).stream()
-                    .filter(f -> !seenIds.contains(f.getId()))
-                    .filter(f -> allCandidates.stream().noneMatch(c -> c.getId().equals(f.getId())))
-                    .collect(Collectors.toList());
-            allCandidates.addAll(topFilled);
-        }
-
-        return allCandidates.stream()
-                .limit(limit)
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        // Шаг 5: запрашиваем TMDb Discover
+        return tmdbService.getRecommendationsByGenreIds(topGenreIds, seenTmdbIds, limit);
     }
 
     // ========================

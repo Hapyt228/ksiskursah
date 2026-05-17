@@ -108,15 +108,18 @@ public class TmdbController {
     }
 
     /**
-     * GET /api/tmdb/discover?genreId=28&page=1
-     * Фильмы определённого жанра через TMDb Discover API.
-     * Используется для фильтрации по жанру на фронтенде.
+     * GET /api/tmdb/discover?genreId=28&yearFrom=2000&yearTo=2023&rating=7.5&page=1
+     * Универсальный Discover — все параметры опциональны.
+     * Если genreId не указан, фильтрует по году/рейтингу без ограничения жанра.
      */
     @GetMapping("/discover")
     public ResponseEntity<List<FilmDto>> discover(
-            @RequestParam Integer genreId,
+            @RequestParam(required = false) Integer genreId,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false) Double rating,
             @RequestParam(defaultValue = "1") int page) {
-        return ResponseEntity.ok(tmdbService.discoverByGenre(genreId, page));
+        return ResponseEntity.ok(tmdbService.discover(genreId, yearFrom, yearTo, rating, page));
     }
 
     // ========================

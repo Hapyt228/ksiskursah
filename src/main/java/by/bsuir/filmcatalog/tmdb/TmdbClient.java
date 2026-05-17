@@ -178,29 +178,46 @@ public class TmdbClient {
     // ========================
 
     /**
-     * GET /discover/movie?with_genres=28&sort_by=popularity.desc&language=ru-RU
-     * Используется для получения фильмов нужного жанра (рекомендации пользователю).
+     * GET /discover/movie — универсальный Discover с фильтрами.
      *
-     * @param genreId  ID жанра в TMDb
-     * @param page     страница (1-500)
+     * @param genreId        ID жанра в TMDb (nullable — если null, жанр не фильтруется)
+     * @param yearFrom       мин. год выхода (nullable)
+     * @param yearTo         макс. год выхода (nullable)
+     * @param voteAverageGte мин. рейтинг (nullable)
+     * @param page           страница (1-500)
      */
-    public TmdbPageResponse discoverByGenre(Integer genreId, int page) {
+    public TmdbPageResponse discover(Integer genreId, Integer yearFrom, Integer yearTo,
+                                     Double voteAverageGte, int page) {
         try {
             return webClient.get()
-                    .uri(u -> u.path("/discover/movie")
-                            .queryParam("with_genres", genreId)
-                            .queryParam("sort_by", "vote_average.desc")
-                            .queryParam("vote_count.gte", "100")  // только популярные
-                            .queryParam("language", language)
-                            .queryParam("page", page)
-                            .build())
+                    .uri(u -> {
+                        var b = u.path("/discover/movie")
+                                .queryParam("sort_by", "vote_average.desc")
+                                .queryParam("vote_count.gte", "100")
+                                .queryParam("language", language)
+                                .queryParam("page", page);
+                        if (genreId != null)        b = b.queryParam("with_genres", genreId);
+                        if (yearFrom != null)        b = b.queryParam("primary_release_date.gte", yearFrom + "-01-01");
+                        if (yearTo   != null)        b = b.queryParam("primary_release_date.lte", yearTo   + "-12-31");
+                        if (voteAverageGte != null)  b = b.queryParam("vote_average.gte", voteAverageGte);
+                        return b.build();
+                    })
                     .retrieve()
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (Exception e) {
-            log.error("TMDb discoverByGenre({}) error", genreId, e);
+            log.error("TMDb discover error (genre={}, yearFrom={}, yearTo={}, rating={})",
+                    genreId, yearFrom, yearTo, voteAverageGte, e);
             return emptyPage();
         }
+    }
+
+    /**
+     * Устаревший метод — оставлен для совместимости с UserFilmService.
+     * Используй discover() напрямую.
+     */
+    public TmdbPageResponse discoverByGenre(Integer genreId, int page) {
+        return discover(genreId, null, null, null, page);
     }
 
     // ========================

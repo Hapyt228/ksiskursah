@@ -164,50 +164,38 @@ async function applyFilters() {
 
     showLoading(true);
     try {
-        // Если жанр выбран — запросить через TMDb discover по genre_id
-        let results = [...allFilms];
+        // Всегда используем TMDb Discover API — фильтры выполняются на сервере
+        // Находим genre_id если жанр выбран
+        const genreId = genre ? (Object.entries(genreMap).find(([, n]) => n === genre)?.[0] || null) : null;
 
-        if (genre) {
-            // Найти id жанра по имени
-            const genreId = Object.entries(genreMap).find(([, name]) => name === genre)?.[0];
-            if (genreId) {
-                try {
-                    // Загрузить фильмы по жанру через discover (несколько страниц)
-                    const [dp1, dp2, dp3] = await Promise.all([
-                        apiFetch(`${API_TMDB}/discover?genreId=${genreId}&page=1`),
-                        apiFetch(`${API_TMDB}/discover?genreId=${genreId}&page=2`),
-                        apiFetch(`${API_TMDB}/discover?genreId=${genreId}&page=3`)
-                    ]);
-                    const discovered = [...(dp1||[]), ...(dp2||[]), ...(dp3||[])];
-                    if (discovered.length > 0) {
-                        results = discovered;
-                    } else {
-                        // Fallback: фильтруем локально по genre строке
-                        results = allFilms.filter(f =>
-                            (f.genre && f.genre.toLowerCase().includes(genre.toLowerCase())) ||
-                            (f.tags  && f.tags.toLowerCase().includes(genre.toLowerCase()))
-                        );
-                    }
-                } catch (_) {
-                    results = allFilms.filter(f =>
-                        (f.genre && f.genre.toLowerCase().includes(genre.toLowerCase())) ||
-                        (f.tags  && f.tags.toLowerCase().includes(genre.toLowerCase()))
-                    );
-                }
-            } else {
-                results = allFilms.filter(f =>
-                    (f.genre && f.genre.toLowerCase().includes(genre.toLowerCase())) ||
-                    (f.tags  && f.tags.toLowerCase().includes(genre.toLowerCase()))
-                );
-            }
-        }
+        // Строим URL с параметрами
+        const buildUrl = (page) => {
+            const params = new URLSearchParams({ page });
+            if (genreId)  params.set('genreId', genreId);
+            if (yearFrom) params.set('yearFrom', yearFrom);
+            if (yearTo)   params.set('yearTo',   yearTo);
+            if (rating)   params.set('rating',   rating);
+            return `${API_TMDB}/discover?${params}`;
+        };
 
-        if (yearFrom) results = results.filter(f => f.year >= parseInt(yearFrom));
-        if (yearTo)   results = results.filter(f => f.year <= parseInt(yearTo));
-        if (rating)   results = results.filter(f => (f.rating || 0) >= parseFloat(rating));
+        // Загружаем 3 страницы параллельно
+        const [r1, r2, r3] = await Promise.all([
+            apiFetch(buildUrl(1)),
+            apiFetch(buildUrl(2)),
+            apiFetch(buildUrl(3))
+        ]);
+        const results = [...(r1||[]), ...(r2||[]), ...(r3||[])];
 
-        renderFilms(results, 'filmsContainer');
-        updateResultsCount(results.length, 'resultsCount');
+        // Убираем дубликаты
+        const seen = new Set();
+        const unique = results.filter(f => {
+            const key = f.tmdbId || f.id;
+            if (seen.has(key)) return false;
+            seen.add(key); return true;
+        });
+
+        renderFilms(unique, 'filmsContainer');
+        updateResultsCount(unique.length, 'resultsCount');
     } catch (_) {
         showToast('Ошибка при фильтрации', 'error');
     } finally {
