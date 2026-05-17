@@ -107,6 +107,20 @@ public class TmdbController {
         return ResponseEntity.ok(tmdbService.getGenres());
     }
 
+    // ========================
+    // Топ фильмов по рейтингу
+    // ========================
+
+    /**
+     * GET /api/tmdb/top_rated?page=1
+     * Возвращает список фильмов с наивысшим рейтингом по версии TMDb.
+     */
+    @GetMapping("/top_rated")
+    public ResponseEntity<List<FilmDto>> getTopRated(
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.getTopRated(page));
+    }
+
     /**
      * GET /api/tmdb/discover?genreId=28&yearFrom=2000&yearTo=2023&rating=7.5&page=1
      * Универсальный Discover — все параметры опциональны.

@@ -47,10 +47,18 @@ public class TmdbService {
     // ========================
 
     /**
-     * Список популярных фильмов (страница 1, до 20 фильмов).
+     * Список популярных фильмов.
      */
     public List<FilmDto> getPopular(int page) {
         TmdbPageResponse response = client.getPopularMovies(page);
+        return convertList(response);
+    }
+
+    /**
+     * Фильмы с наивысшим рейтингом TMDb (/movie/top_rated).
+     */
+    public List<FilmDto> getTopRated(int page) {
+        TmdbPageResponse response = client.getTopRatedMovies(page);
         return convertList(response);
     }
 

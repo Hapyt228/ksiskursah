@@ -11,6 +11,7 @@ const API_USER   = '/api/user';
 let allFilms     = [];
 let currentView  = 'grid';
 let isLoading    = false;
+let previousPage = 'catalog'; // откуда пришли на страницу деталей
 
 // Жанры TMDb (id → name), заполняется при loadFilters()
 let genreMap = {};
@@ -28,6 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // Навигация
 // ========================
 function showPage(name) {
+    // Запоминаем страницу, с которой уходим (не сохраняем 'details' как предыдущую)
+    const currentVisible = ['catalog','search','top','history'].find(p => {
+        const el = document.getElementById(`page-${p}`);
+        return el && !el.classList.contains('d-none');
+    });
+    if (currentVisible && currentVisible !== 'details') {
+        previousPage = currentVisible;
+    }
+
     document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
     document.getElementById(`page-${name}`)?.classList.remove('d-none');
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -36,6 +46,11 @@ function showPage(name) {
         case 'catalog': loadAllFilms();  break;
         case 'top':     loadTopFilms();  break;
         case 'history': loadHistory();   break;
+    }
+
+    // При возврате с деталей обновляем рекомендации
+    if (name !== 'details' && Auth.isLoggedIn()) {
+        loadRecommendations();
     }
 }
 
@@ -94,11 +109,10 @@ async function loadTopFilms() {
     if (container) container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-accent"></div></div>`;
     try {
         // Загружаем 5 страниц параллельно, сортируем по рейтингу
-        const pages = await Promise.all([1,2,3,4,5].map(p => apiFetch(`${API_TMDB}/popular?page=${p}`)));
+        // Используем реальный TMDb top_rated endpoint — уже отсортирован по рейтингу
+        const pages = await Promise.all([1,2,3,4,5].map(p => apiFetch(`${API_TMDB}/top_rated?page=${p}`)));
         const films = pages.flat().filter(Boolean);
-        // Сортируем по рейтингу убывающе
-        films.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        // Берём топ 100 уникальных
+        // Убираем дубликаты (на случай пересечений между страницами)
         const seen = new Set();
         const top = films.filter(f => {
             const key = f.tmdbId || f.id;
@@ -259,6 +273,13 @@ async function performSearch(query) {
 // ========================
 async function openTmdbFilmDetails(tmdbId) {
     try {
+        // Запоминаем текущую страницу перед переходом на детали
+        const visiblePage = ['catalog','search','top','history'].find(p => {
+            const el = document.getElementById(`page-${p}`);
+            return el && !el.classList.contains('d-none');
+        });
+        if (visiblePage) previousPage = visiblePage;
+
         document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
         document.getElementById('page-details')?.classList.remove('d-none');
         document.getElementById('filmDetailsContent').innerHTML =
@@ -284,6 +305,13 @@ async function openFilmDetails(filmId) {
     if (cached && cached.tmdbId) return openTmdbFilmDetails(cached.tmdbId);
 
     try {
+        // Запоминаем текущую страницу
+        const visiblePage = ['catalog','search','top','history'].find(p => {
+            const el = document.getElementById(`page-${p}`);
+            return el && !el.classList.contains('d-none');
+        });
+        if (visiblePage) previousPage = visiblePage;
+
         document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
         document.getElementById('page-details')?.classList.remove('d-none');
 
@@ -366,7 +394,7 @@ async function renderFilmDetails(film, recommendations, tmdbId) {
     if (!detailsEl) return;
     detailsEl.innerHTML = `
         <div class="mb-3">
-            <button class="btn btn-outline-secondary btn-sm" onclick="history.back()">
+            <button class="btn btn-outline-secondary btn-sm" onclick="showPage(previousPage)">
                 <i class="bi bi-arrow-left me-1"></i>Назад
             </button>
         </div>

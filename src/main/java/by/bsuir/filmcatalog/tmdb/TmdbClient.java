@@ -68,6 +68,33 @@ public class TmdbClient {
     }
 
     // ========================
+    // Топ фильмов по рейтингу
+    // ========================
+
+    /**
+     * GET /movie/top_rated?language=ru-RU&page=1
+     * Фильмы с наивысшим рейтингом TMDb.
+     */
+    public TmdbPageResponse getTopRatedMovies(int page) {
+        try {
+            return webClient.get()
+                    .uri(u -> u.path("/movie/top_rated")
+                            .queryParam("language", language)
+                            .queryParam("page", page)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TmdbPageResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("TMDb getTopRatedMovies error: {} {}", e.getStatusCode(), e.getMessage());
+            return emptyPage();
+        } catch (Exception e) {
+            log.error("TMDb getTopRatedMovies unexpected error", e);
+            return emptyPage();
+        }
+    }
+
+    // ========================
     // Поиск фильмов
     // ========================
 
