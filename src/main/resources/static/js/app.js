@@ -20,6 +20,8 @@ let genreMap = {};
 // Инициализация
 // ========================
 document.addEventListener('DOMContentLoaded', () => {
+    // Сбрасываем фильтры через setTimeout чтобы сработать после автовосстановления браузера
+    setTimeout(() => resetFiltersUI(), 0);
     loadFilters();
     showPage('catalog');
     document.getElementById('btnGrid')?.classList.add('active');
@@ -29,27 +31,26 @@ document.addEventListener('DOMContentLoaded', () => {
 // Навигация
 // ========================
 function showPage(name) {
-    // Запоминаем страницу, с которой уходим (не сохраняем 'details' как предыдущую)
+    // Запоминаем текущую видимую страницу как previousPage — для кнопки Назад
     const currentVisible = ['catalog','search','top','history'].find(p => {
         const el = document.getElementById(`page-${p}`);
         return el && !el.classList.contains('d-none');
     });
-    if (currentVisible && currentVisible !== 'details') {
-        previousPage = currentVisible;
-    }
+    if (currentVisible) previousPage = currentVisible;
 
     document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
     document.getElementById(`page-${name}`)?.classList.remove('d-none');
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
     switch (name) {
-        case 'catalog': loadAllFilms();  break;
-        case 'top':     loadTopFilms();  break;
-        case 'history': loadHistory();   break;
+        case 'catalog': resetFiltersUI(); loadAllFilms(); break;
+        case 'top':     loadTopFilms();   break;
+        case 'history': loadHistory();    break;
     }
 
-    // При возврате с деталей обновляем рекомендации
-    if (name !== 'details' && Auth.isLoggedIn()) {
+    // Обновляем рекомендации только при возврате с деталей на каталог,
+    // и НЕ на странице истории — там свой лоадер
+    if (name === 'catalog' && Auth.isLoggedIn()) {
         loadRecommendations();
     }
 }

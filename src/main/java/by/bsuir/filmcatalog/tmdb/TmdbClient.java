@@ -221,11 +221,11 @@ public class TmdbClient {
                         var b = u.path("/discover/movie")
                                 .queryParam("language", language)
                                 .queryParam("page", page);
-                        // vote_count.gte: при фильтре по рейтингу 9+ — минимальный порог (10 голосов),
-                        // чтобы новые фильмы (2025-2026) попадали в выдачу.
-                        // Без фильтра рейтинга — стандартный порог 200 для качественных результатов.
+                        // vote_count.gte:
+                        //  - фильтр рейтинга 9+ → 50 голосов (новые фильмы 2025-2026 попадают)
+                        //  - без фильтра рейтинга → 200 голосов (качественные результаты)
                         if (voteAverageGte != null && voteAverageGte >= 8.5) {
-                            b = b.queryParam("vote_count.gte", "10")
+                            b = b.queryParam("vote_count.gte", "50")
                                  .queryParam("sort_by", "vote_average.desc");
                         } else {
                             b = b.queryParam("vote_count.gte", "200")
