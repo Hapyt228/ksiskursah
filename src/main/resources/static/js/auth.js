@@ -132,8 +132,46 @@ const Auth = (() => {
         clearTokens();
     }
 
+    /**
+     * Декодирует payload JWT (base64url) без верификации подписи.
+     * Используется только для проверки срока жизни `exp`.
+     */
+    function decodeJwtPayload(token) {
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            return JSON.parse(atob(payload));
+        } catch (_) { return null; }
+    }
+
+    /**
+     * Проверяет сессию при старте.
+     * - Если access token есть и не истёк — OK.
+     * - Если истёк / недействителен — пробует refresh.
+     * - Если refresh тоже провалился — clearTokens().
+     * Возвращает true если пользователь авторизован после проверки.
+     */
+    async function initAuth() {
+        const accessToken = getAccessToken();
+        if (!accessToken) return false;
+
+        const payload = decodeJwtPayload(accessToken);
+        const nowSec  = Math.floor(Date.now() / 1000);
+        // Если токен действителен (+ 30 сек запас на задержку сети) — OK
+        if (payload && payload.exp && payload.exp > nowSec + 30) return true;
+
+        // Токен истёк или не декодируется — пробуем refresh
+        if (getRefreshToken()) {
+            const refreshed = await tryRefresh();
+            if (refreshed) return true;
+        }
+        clearTokens();
+        return false;
+    }
+
     return { saveTokens, clearTokens, getAccessToken, getRefreshToken,
-             getCurrentUser, isLoggedIn, authFetch, login, register, logout };
+             getCurrentUser, isLoggedIn, authFetch, login, register, logout, initAuth };
 })();
 
 // ========================
@@ -152,8 +190,6 @@ function updateNavbar() {
 
     if (isAuth) {
         document.getElementById('navUsername').textContent = user.username;
-        // Загружаем рекомендации
-        loadRecommendations();
     } else {
         document.getElementById('recommendationsSection')?.classList.add('d-none');
     }
@@ -234,7 +270,4 @@ async function loadRecommendations() {
     } catch(_) {}
 }
 
-// Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', () => {
-    updateNavbar();
-});
+// Инициализация происходит в app.js через Auth.initAuth() + updateNavbar()

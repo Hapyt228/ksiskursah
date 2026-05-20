@@ -19,8 +19,12 @@ let genreMap = {};
 // ========================
 // Инициализация
 // ========================
-document.addEventListener('DOMContentLoaded', () => {
-    // Сбрасываем фильтры через setTimeout чтобы сработать после автовосстановления браузера
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Проверяем/обновляем токен до инициализации UI
+    await Auth.initAuth();
+    // 2. Обновляем navbar (топерь токен точно актуален)
+    updateNavbar();
+    // 3. Сбрасываем фильтры (после автовосстановления браузера)
     setTimeout(() => resetFiltersUI(), 0);
     loadFilters();
     showPage('catalog');

@@ -35,41 +35,10 @@ public interface FilmRepository extends JpaRepository<Film, Long> {
     List<Film> searchByQuery(@Param("query") String query);
 
     /**
-     * Фильтрация по жанру (регистронезависимо).
-     */
-    List<Film> findByGenreIgnoreCase(String genre);
-
-    /**
-     * Фильтрация по диапазону годов.
-     */
-    List<Film> findByYearBetween(Integer yearFrom, Integer yearTo);
-
-    /**
-     * Фильтрация по минимальному рейтингу.
-     */
-    List<Film> findByRatingGreaterThanEqualOrderByRatingDesc(Double minRating);
-
-    /**
-     * Фильтрация по стране производства.
-     */
-    List<Film> findByCountryIgnoreCase(String country);
-
-    /**
-     * Фильтрация по режиссёру.
-     */
-    List<Film> findByDirectorIgnoreCaseContaining(String director);
-
-    /**
      * Получить все уникальные жанры (для фильтров UI).
      */
     @Query("SELECT DISTINCT f.genre FROM Film f ORDER BY f.genre")
     List<String> findAllDistinctGenres();
-
-    /**
-     * Получить все уникальные страны.
-     */
-    @Query("SELECT DISTINCT f.country FROM Film f WHERE f.country IS NOT NULL ORDER BY f.country")
-    List<String> findAllDistinctCountries();
 
     /**
      * Топ фильмов по рейтингу (для рекомендаций).
@@ -89,21 +58,4 @@ public interface FilmRepository extends JpaRepository<Film, Long> {
     @Query("SELECT f FROM Film f WHERE f.director = :director AND f.id <> :excludeId ORDER BY f.rating DESC LIMIT 4")
     List<Film> findByDirectorExcluding(@Param("director") String director, @Param("excludeId") Long excludeId);
 
-    /**
-     * Комбинированная фильтрация.
-     */
-    @Query("SELECT f FROM Film f WHERE " +
-           "(:genre IS NULL OR LOWER(f.genre) = LOWER(:genre)) AND " +
-           "(:yearFrom IS NULL OR f.year >= :yearFrom) AND " +
-           "(:yearTo IS NULL OR f.year <= :yearTo) AND " +
-           "(:minRating IS NULL OR f.rating >= :minRating) AND " +
-           "(:country IS NULL OR LOWER(f.country) = LOWER(:country)) " +
-           "ORDER BY f.rating DESC")
-    List<Film> findByFilters(
-            @Param("genre") String genre,
-            @Param("yearFrom") Integer yearFrom,
-            @Param("yearTo") Integer yearTo,
-            @Param("minRating") Double minRating,
-            @Param("country") String country
-    );
 }

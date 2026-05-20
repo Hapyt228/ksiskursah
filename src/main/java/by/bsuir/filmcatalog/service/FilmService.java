@@ -97,18 +97,6 @@ public class FilmService {
     }
 
     /**
-     * Комбинированная фильтрация по нескольким критериям.
-     */
-    @Transactional(readOnly = true)
-    public List<FilmDto> filterFilms(String genre, Integer yearFrom, Integer yearTo,
-                                      Double minRating, String country) {
-        return filmRepository.findByFilters(genre, yearFrom, yearTo, minRating, country)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-    }
-
-    /**
      * Топ фильмов по рейтингу.
      */
     @Transactional(readOnly = true)
@@ -161,11 +149,6 @@ public class FilmService {
     @Transactional(readOnly = true)
     public List<String> getAllGenres() {
         return filmRepository.findAllDistinctGenres();
-    }
-
-    @Transactional(readOnly = true)
-    public List<String> getAllCountries() {
-        return filmRepository.findAllDistinctCountries();
     }
 
     // ========================

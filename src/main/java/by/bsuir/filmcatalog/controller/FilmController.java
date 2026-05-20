@@ -90,20 +90,6 @@ public class FilmController {
     }
 
     /**
-     * GET /api/films/filter — фильтрация по нескольким параметрам.
-     * Параметры (все необязательные): genre, yearFrom, yearTo, minRating, country
-     */
-    @GetMapping("/filter")
-    public ResponseEntity<List<FilmDto>> filterFilms(
-            @RequestParam(required = false) String genre,
-            @RequestParam(required = false) Integer yearFrom,
-            @RequestParam(required = false) Integer yearTo,
-            @RequestParam(required = false) Double minRating,
-            @RequestParam(required = false) String country) {
-        return ResponseEntity.ok(filmService.filterFilms(genre, yearFrom, yearTo, minRating, country));
-    }
-
-    /**
      * GET /api/films/top?limit=10 — топ фильмов по рейтингу.
      */
     @GetMapping("/top")
@@ -135,14 +121,6 @@ public class FilmController {
     @GetMapping("/meta/genres")
     public ResponseEntity<List<String>> getAllGenres() {
         return ResponseEntity.ok(filmService.getAllGenres());
-    }
-
-    /**
-     * GET /api/films/meta/countries — список всех стран.
-     */
-    @GetMapping("/meta/countries")
-    public ResponseEntity<List<String>> getAllCountries() {
-        return ResponseEntity.ok(filmService.getAllCountries());
     }
 
     // ========================
