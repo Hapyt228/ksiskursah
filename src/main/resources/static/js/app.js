@@ -311,18 +311,48 @@ function resetFilters() {
 // ========================
 // Поиск
 // ========================
+
+/** Текущий режим поиска: 'title' | 'director' | 'keyword' */
+let searchMode = 'title';
+
+/** Плейсхолдеры для каждого режима */
+const SEARCH_PLACEHOLDERS = {
+    title:    'Введите название фильма...',
+    director: 'Имя режиссёра (напр. Нолан, Кубрик...)',
+    keyword:  'Тема / описание (напр. робот, война, космос...)'
+};
+
+/** Префиксы для строки результатов */
+const SEARCH_MODE_LABELS = {
+    title:    'Поиск по названию:',
+    director: 'Поиск по режиссёру:',
+    keyword:  'Поиск по описанию:'
+};
+
+function setSearchMode(mode, btn) {
+    searchMode = mode;
+    // Сбрасываем активный класс у всех кнопок
+    document.querySelectorAll('.search-mode-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    // Обновляем placeholder
+    const input = document.getElementById('heroSearchInput');
+    if (input) input.placeholder = SEARCH_PLACEHOLDERS[mode] || '';
+}
+
 function handleNavSearch(e) {
     e.preventDefault();
     const q = document.getElementById('navSearchInput')?.value.trim();
-    if (q) performSearch(q);
+    if (q) performSearch(q, searchMode);
 }
 function handleHeroSearch(e) {
     e.preventDefault();
     const q = document.getElementById('heroSearchInput')?.value.trim();
-    if (q) performSearch(q);
+    if (q) performSearch(q, searchMode);
 }
 
-async function performSearch(query) {
+async function performSearch(query, mode) {
+    mode = mode || 'title';
+
     // Запоминаем страницу, с которой идёт поиск
     const visiblePage = ['catalog','search','top','history'].find(p => {
         const el = document.getElementById(`page-${p}`);
@@ -333,20 +363,37 @@ async function performSearch(query) {
     // Переключаем на страницу поиска сразу
     document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
     document.getElementById('page-search')?.classList.remove('d-none');
-    const label = document.getElementById('searchQueryLabel');
-    if (label) label.textContent = `"${query}"`;
+
+    // Обновляем префикс режима и запрос
+    const prefixEl = document.getElementById('searchModeLabelPrefix');
+    const labelEl  = document.getElementById('searchQueryLabel');
+    if (prefixEl) prefixEl.textContent = SEARCH_MODE_LABELS[mode] || 'Поиск:';
+    if (labelEl)  labelEl.textContent  = `«${query}»`;
 
     const container = document.getElementById('searchResultsContainer');
     if (container) container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-accent"></div><p class="mt-2 text-muted">Поиск...</p></div>`;
 
     try {
-        // Параллельно загружаем 2 страницы результатов поиска
-        const [r1, r2] = await Promise.all([
-            apiFetch(`${API_TMDB}/search?q=${encodeURIComponent(query)}&page=1`),
-            apiFetch(`${API_TMDB}/search?q=${encodeURIComponent(query)}&page=2`).catch(() => [])
-        ]);
-        const films = [...(r1||[]), ...(r2||[])];
-        // Убираем дубликаты по tmdbId
+        let films = [];
+
+        if (mode === 'director') {
+            // Поиск по режиссёру: /search/person → /discover?with_crew
+            films = await apiFetch(`${API_TMDB}/search/director?q=${encodeURIComponent(query)}`);
+
+        } else if (mode === 'keyword') {
+            // Поиск по описанию/тематике: /search/keyword → /discover?with_keywords
+            films = await apiFetch(`${API_TMDB}/search/keyword?q=${encodeURIComponent(query)}`);
+
+        } else {
+            // Поиск по названию: две страницы параллельно
+            const [r1, r2] = await Promise.all([
+                apiFetch(`${API_TMDB}/search?q=${encodeURIComponent(query)}&page=1`),
+                apiFetch(`${API_TMDB}/search?q=${encodeURIComponent(query)}&page=2`).catch(() => [])
+            ]);
+            films = [...(r1||[]), ...(r2||[])];
+        }
+
+        // Дедупликация по tmdbId
         const seen = new Set();
         const unique = films.filter(f => {
             const key = f.tmdbId || f.id;

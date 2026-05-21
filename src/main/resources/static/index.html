@@ -81,8 +81,14 @@
             <h1 class="hero-title">Откройте мир кино</h1>
             <p class="hero-subtitle">Тысячи фильмов с рекомендациями, поиском и фильтрацией</p>
             <div class="hero-search-wrap">
+                <!-- Переключатель режима поиска -->
+                <div class="search-mode-tabs mb-2">
+                    <button class="search-mode-tab active" data-mode="title" onclick="setSearchMode('title', this)">По названию</button>
+                    <button class="search-mode-tab" data-mode="director" onclick="setSearchMode('director', this)">По режиссёру</button>
+                    <button class="search-mode-tab" data-mode="keyword" onclick="setSearchMode('keyword', this)">По описанию</button>
+                </div>
                 <form class="hero-search-form" onsubmit="handleHeroSearch(event)">
-                    <input type="text" id="heroSearchInput" class="hero-search-input" placeholder="Название, режиссёр, описание...">
+                    <input type="text" id="heroSearchInput" class="hero-search-input" placeholder="Введите название фильма...">
                     <button type="submit" class="hero-search-btn"><i class="bi bi-search"></i> Найти</button>
                 </form>
             </div>
@@ -188,9 +194,13 @@
 <!-- ===== СТРАНИЦА: РЕЗУЛЬТАТЫ ПОИСКА ===== -->
 <div id="page-search" class="page d-none">
     <div class="container py-5">
-        <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
             <button class="btn btn-outline-secondary btn-sm" onclick="showPage(previousPage)"><i class="bi bi-arrow-left"></i> Назад</button>
-            <h4 class="mb-0">Результаты: <span id="searchQueryLabel" class="text-accent"></span></h4>
+            <div>
+                <span class="text-muted me-1" id="searchModeLabelPrefix">Поиск по названию:</span>
+                <span id="searchQueryLabel" class="text-accent fw-semibold"></span>
+            </div>
+            <span id="searchResultsCount" class="badge bg-secondary ms-auto"></span>
         </div>
         <div id="searchResultsContainer" class="films-grid"></div>
     </div>

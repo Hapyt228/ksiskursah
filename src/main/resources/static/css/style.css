@@ -926,3 +926,35 @@ a { text-decoration: none; color: inherit; }
 .history-group .films-grid {
     margin-top: 0.75rem;
 }
+
+/* ========================
+   Вкладки режима поиска
+   ======================== */
+.search-mode-tabs {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+}
+
+.search-mode-tab {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.65);
+    border-radius: 20px;
+    padding: 0.3rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-mode-tab:hover {
+    border-color: var(--accent, #e50914);
+    color: #fff;
+}
+
+.search-mode-tab.active {
+    background: var(--accent, #e50914);
+    border-color: var(--accent, #e50914);
+    color: #fff;
+    font-weight: 600;
+}

@@ -67,6 +67,35 @@ public class TmdbController {
         return ResponseEntity.ok(tmdbService.search(query, page));
     }
 
+    /**
+     * GET /api/tmdb/search/director?q=Nolan
+     * Поиск фильмов по имени режиссёра.
+     * Алгоритм: /search/person → person_id → /discover/movie?with_crew=id
+     */
+    @GetMapping("/search/director")
+    public ResponseEntity<List<FilmDto>> searchByDirector(
+            @RequestParam("q") String name) {
+        if (name == null || name.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(tmdbService.searchByDirector(name));
+    }
+
+    /**
+     * GET /api/tmdb/search/keyword?q=робот
+     * Поиск фильмов по ключевому слову в описании.
+     * Алгоритм: /search/keyword → keyword_id → /discover/movie?with_keywords=id
+     * Fallback: /search/movie (TMDb ищет в overview тоже)
+     */
+    @GetMapping("/search/keyword")
+    public ResponseEntity<List<FilmDto>> searchByKeyword(
+            @RequestParam("q") String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(tmdbService.searchByKeyword(keyword));
+    }
+
     // ========================
     // Детали фильма
     // ========================

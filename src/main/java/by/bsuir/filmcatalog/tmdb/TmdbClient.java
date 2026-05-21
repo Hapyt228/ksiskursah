@@ -256,6 +256,109 @@ public class TmdbClient {
     }
 
     // ========================
+    // Поиск персоны (режиссёр)
+    // ========================
+
+    /**
+     * GET /search/person?query=...&language=ru-RU
+     * Находит людей (режиссёров, актёров) по имени.
+     */
+    public TmdbPersonPageResponse searchPersons(String query) {
+        try {
+            return webClient.get()
+                    .uri(u -> u.path("/search/person")
+                            .queryParam("query", query)
+                            .queryParam("language", language)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TmdbPersonPageResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("TMDb searchPersons error: {} {}", e.getStatusCode(), e.getMessage());
+            return emptyPersonPage();
+        } catch (Exception e) {
+            log.error("TMDb searchPersons unexpected error", e);
+            return emptyPersonPage();
+        }
+    }
+
+    /**
+     * GET /discover/movie?with_crew={personId} — фильмы режиссёра по его person_id.
+     * sort_by=vote_count.desc — чтобы первыми шли самые известные фильмы.
+     */
+    public TmdbPageResponse discoverByDirector(Long personId, int page) {
+        try {
+            return webClient.get()
+                    .uri(u -> u.path("/discover/movie")
+                            .queryParam("language", language)
+                            .queryParam("with_crew", personId)
+                            .queryParam("sort_by", "vote_count.desc")
+                            .queryParam("page", page)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TmdbPageResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("TMDb discoverByDirector({}) error: {}", personId, e.getStatusCode());
+            return emptyPage();
+        } catch (Exception e) {
+            log.error("TMDb discoverByDirector unexpected error", e);
+            return emptyPage();
+        }
+    }
+
+    // ========================
+    // Поиск по ключевому слову (описание)
+    // ========================
+
+    /**
+     * GET /search/keyword?query=... — находит TMDb keyword_id по слову.
+     * Потом этот keyword_id используется в /discover/movie?with_keywords=...
+     */
+    public TmdbKeywordPageResponse searchKeywords(String query) {
+        try {
+            return webClient.get()
+                    .uri(u -> u.path("/search/keyword")
+                            .queryParam("query", query)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TmdbKeywordPageResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("TMDb searchKeywords error: {} {}", e.getStatusCode(), e.getMessage());
+            return emptyKeywordPage();
+        } catch (Exception e) {
+            log.error("TMDb searchKeywords unexpected error", e);
+            return emptyKeywordPage();
+        }
+    }
+
+    /**
+     * GET /discover/movie?with_keywords={keywordId} — фильмы с данным ключевым словом.
+     * Ключевые слова в TMDb теги тематики: robot, space, vampire и т..
+     */
+    public TmdbPageResponse discoverByKeyword(Long keywordId, int page) {
+        try {
+            return webClient.get()
+                    .uri(u -> u.path("/discover/movie")
+                            .queryParam("language", language)
+                            .queryParam("with_keywords", keywordId)
+                            .queryParam("sort_by", "vote_count.desc")
+                            .queryParam("page", page)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TmdbPageResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("TMDb discoverByKeyword({}) error: {}", keywordId, e.getStatusCode());
+            return emptyPage();
+        } catch (Exception e) {
+            log.error("TMDb discoverByKeyword unexpected error", e);
+            return emptyPage();
+        }
+    }
+
+    // ========================
     // Вспомогательные
     // ========================
 
@@ -265,6 +368,19 @@ public class TmdbClient {
         r.setPage(1);
         r.setTotalPages(0);
         r.setTotalResults(0);
+        return r;
+    }
+
+    private TmdbPersonPageResponse emptyPersonPage() {
+        TmdbPersonPageResponse r = new TmdbPersonPageResponse();
+        r.setResults(Collections.emptyList());
+        r.setTotalResults(0);
+        return r;
+    }
+
+    private TmdbKeywordPageResponse emptyKeywordPage() {
+        TmdbKeywordPageResponse r = new TmdbKeywordPageResponse();
+        r.setResults(Collections.emptyList());
         return r;
     }
 }
