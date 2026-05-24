@@ -3,7 +3,7 @@ package by.bsuir.filmcatalog.service;
 import by.bsuir.filmcatalog.dto.FilmDto;
 import by.bsuir.filmcatalog.model.*;
 import by.bsuir.filmcatalog.repository.*;
-import by.bsuir.filmcatalog.tmdb.TmdbService;
+import by.bsuir.filmcatalog.kp.KinopoiskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +41,7 @@ public class UserFilmService {
     @Autowired private MovieViewHistoryRepository viewHistoryRepository;
     @Autowired private MovieUserStatusRepository statusRepository;
     @Autowired private MovieRatingRepository ratingRepository;
-    @Autowired private TmdbService tmdbService;
+    @Autowired private KinopoiskService tmdbService;
 
     // ========================
     // История просмотров
