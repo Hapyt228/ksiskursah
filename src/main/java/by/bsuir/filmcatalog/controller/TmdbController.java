@@ -2,7 +2,7 @@ package by.bsuir.filmcatalog.controller;
 
 import by.bsuir.filmcatalog.dto.FilmDto;
 import by.bsuir.filmcatalog.dto.tmdb.TmdbGenreDto;
-import by.bsuir.filmcatalog.kp.KinopoiskService;
+import by.bsuir.filmcatalog.tmdb.TmdbService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,35 +10,53 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * REST-контроллер для данных из Kinopoisk API.
- * URL остался /api/tmdb — фронтенд менять не нужно.
+ * REST-контроллер для данных из TMDb API.
+ * Базовый URL: /api/tmdb
+ *
+ * Эндпоинты:
+ *   GET /api/tmdb/popular          — популярные фильмы (страница 1..N)
+ *   GET /api/tmdb/search?q=...     — поиск по названию
+ *   GET /api/tmdb/movie/{tmdbId}   — детали фильма
+ *   GET /api/tmdb/genres           — список жанров
+ *   GET /api/tmdb/movie/{tmdbId}/similar — похожие фильмы
+ *
+ * Всё это публичные эндпоинты (не требуют авторизации).
+ * Авторизованные пользовательские действия (статус, рейтинг, просмотр) —
+ * по-прежнему в UserFilmController под /api/user/films/{id}/...
  */
 @RestController
 @RequestMapping("/api/tmdb")
 @CrossOrigin(origins = "*")
 public class TmdbController {
 
-    private final KinopoiskService kpService;
+    private final TmdbService tmdbService;
 
-    public TmdbController(KinopoiskService kpService) {
-        this.kpService = kpService;
+    public TmdbController(TmdbService tmdbService) {
+        this.tmdbService = tmdbService;
     }
 
-    /** GET /api/tmdb/popular?page=1 */
+    // ========================
+    // Популярные фильмы
+    // ========================
+
+    /**
+     * GET /api/tmdb/popular?page=1
+     * Возвращает список популярных фильмов (до 20 за запрос).
+     */
     @GetMapping("/popular")
     public ResponseEntity<List<FilmDto>> getPopular(
             @RequestParam(defaultValue = "1") int page) {
-        return ResponseEntity.ok(kpService.getPopular(page));
+        return ResponseEntity.ok(tmdbService.getPopular(page));
     }
 
-    /** GET /api/tmdb/top_rated?page=1 */
-    @GetMapping("/top_rated")
-    public ResponseEntity<List<FilmDto>> getTopRated(
-            @RequestParam(defaultValue = "1") int page) {
-        return ResponseEntity.ok(kpService.getTopRated(page));
-    }
+    // ========================
+    // Поиск
+    // ========================
 
-    /** GET /api/tmdb/search?q=Inception&page=1 */
+    /**
+     * GET /api/tmdb/search?q=Inception&page=1
+     * Поиск фильмов по названию через TMDb.
+     */
     @GetMapping("/search")
     public ResponseEntity<List<FilmDto>> search(
             @RequestParam("q") String query,
@@ -46,73 +64,99 @@ public class TmdbController {
         if (query == null || query.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(kpService.search(query, page));
+        return ResponseEntity.ok(tmdbService.search(query, page));
     }
 
-    /** GET /api/tmdb/search/director?q=Нолан */
+    /**
+     * GET /api/tmdb/search/director?q=Nolan
+     * Поиск фильмов по имени режиссёра.
+     * Алгоритм: /search/person → person_id → /discover/movie?with_crew=id
+     */
     @GetMapping("/search/director")
     public ResponseEntity<List<FilmDto>> searchByDirector(
             @RequestParam("q") String name) {
         if (name == null || name.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(kpService.searchByDirector(name));
+        return ResponseEntity.ok(tmdbService.searchByDirector(name));
     }
 
-    /** GET /api/tmdb/movie/{kpId} */
+    // ========================
+    // Детали фильма
+    // ========================
+
+    /**
+     * GET /api/tmdb/movie/{tmdbId}
+     * Детальная информация о фильме: жанры, режиссёр, страна, credits.
+     */
     @GetMapping("/movie/{tmdbId}")
     public ResponseEntity<?> getMovie(@PathVariable Long tmdbId) {
-        FilmDto dto = kpService.getDetails(tmdbId);
+        FilmDto dto = tmdbService.getDetails(tmdbId);
         if (dto == null) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(dto);
     }
 
-    /** GET /api/tmdb/movie/{kpId}/similar */
+    /**
+     * GET /api/tmdb/movie/{tmdbId}/similar
+     * Похожие фильмы для блока "Рекомендации" на странице фильма.
+     */
     @GetMapping("/movie/{tmdbId}/similar")
     public ResponseEntity<List<FilmDto>> getSimilar(@PathVariable Long tmdbId) {
-        return ResponseEntity.ok(kpService.getSimilar(tmdbId));
+        return ResponseEntity.ok(tmdbService.getSimilar(tmdbId));
     }
 
-    /** GET /api/tmdb/genres */
+    // ========================
+    // Жанры
+    // ========================
+
+    /**
+     * GET /api/tmdb/genres
+     * Полный список жанров TMDb (id + name на русском).
+     * Используется для фильтра на фронтенде.
+     */
     @GetMapping("/genres")
     public ResponseEntity<List<TmdbGenreDto>> getGenres() {
-        return ResponseEntity.ok(kpService.getGenres());
+        return ResponseEntity.ok(tmdbService.getGenres());
+    }
+
+    // ========================
+    // Топ фильмов по рейтингу
+    // ========================
+
+    /**
+     * GET /api/tmdb/top_rated?page=1
+     * Возвращает список фильмов с наивысшим рейтингом по версии TMDb.
+     */
+    @GetMapping("/top_rated")
+    public ResponseEntity<List<FilmDto>> getTopRated(
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.getTopRated(page));
     }
 
     /**
-     * GET /api/tmdb/discover — фильтрация по жанру, году и рейтингу через KP API.
-     * Фронтенд шлёт: genre (название), yearFrom, yearTo, rating (min), page.
+     * GET /api/tmdb/discover?genreId=28&yearFrom=2000&yearTo=2023&rating=7.5&page=1
+     * Универсальный Discover — все параметры опциональны.
+     * Если genreId не указан, фильтрует по году/рейтингу без ограничения жанра.
      */
     @GetMapping("/discover")
     public ResponseEntity<List<FilmDto>> discover(
-            @RequestParam(required = false) String  genre,
-            @RequestParam(required = false) Integer genreId,   // обратная совместимость
+            @RequestParam(required = false) Integer genreId,
             @RequestParam(required = false) Integer yearFrom,
             @RequestParam(required = false) Integer yearTo,
-            @RequestParam(required = false) Double  rating,
-            @RequestParam(defaultValue = "1") int   page) {
-
-        boolean hasFilters = (genre != null && !genre.isBlank())
-                || genreId != null || yearFrom != null || yearTo != null || rating != null;
-
-        if (!hasFilters) {
-            return ResponseEntity.ok(kpService.getPopular(page));
-        }
-
-        // Если пришёл genreId (старый путь) — преобразуем в имя жанра
-        String resolvedGenre = genre;
-        if (resolvedGenre == null && genreId != null) {
-            resolvedGenre = kpService.resolveGenreName(genreId);
-        }
-
-        return ResponseEntity.ok(kpService.discoverByFilters(resolvedGenre, yearFrom, yearTo, rating, page));
+            @RequestParam(required = false) Double rating,
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.discover(genreId, yearFrom, yearTo, rating, page));
     }
+
+    // ========================
+    // Обработка ошибок
+    // ========================
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleError(Exception ex) {
         return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Kinopoisk API ошибка: " + ex.getMessage()));
+                .body(Map.of("error", "TMDb ошибка: " + ex.getMessage()));
     }
 }
