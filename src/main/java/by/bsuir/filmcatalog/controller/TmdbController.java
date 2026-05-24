@@ -81,15 +81,33 @@ public class TmdbController {
         return ResponseEntity.ok(kpService.getGenres());
     }
 
-    /** GET /api/tmdb/discover — оставляем для совместимости, отдаёт популярные */
+    /**
+     * GET /api/tmdb/discover — фильтрация по жанру, году и рейтингу через KP API.
+     * Фронтенд шлёт: genre (название), yearFrom, yearTo, rating (min), page.
+     */
     @GetMapping("/discover")
     public ResponseEntity<List<FilmDto>> discover(
-            @RequestParam(required = false) Integer genreId,
-            @RequestParam(defaultValue = "1") int page) {
-        if (genreId != null) {
-            return ResponseEntity.ok(kpService.getByGenreId(genreId, 20));
+            @RequestParam(required = false) String  genre,
+            @RequestParam(required = false) Integer genreId,   // обратная совместимость
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false) Double  rating,
+            @RequestParam(defaultValue = "1") int   page) {
+
+        boolean hasFilters = (genre != null && !genre.isBlank())
+                || genreId != null || yearFrom != null || yearTo != null || rating != null;
+
+        if (!hasFilters) {
+            return ResponseEntity.ok(kpService.getPopular(page));
         }
-        return ResponseEntity.ok(kpService.getPopular(page));
+
+        // Если пришёл genreId (старый путь) — преобразуем в имя жанра
+        String resolvedGenre = genre;
+        if (resolvedGenre == null && genreId != null) {
+            resolvedGenre = kpService.resolveGenreName(genreId);
+        }
+
+        return ResponseEntity.ok(kpService.discoverByFilters(resolvedGenre, yearFrom, yearTo, rating, page));
     }
 
     @ExceptionHandler(Exception.class)

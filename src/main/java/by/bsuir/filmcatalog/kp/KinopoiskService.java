@@ -138,6 +138,18 @@ public class KinopoiskService {
     }
 
     /**
+     * Фильтрация через KP API: жанр, год, рейтинг.
+     * genreName  — название жанра как в genreMap (например "Боевик"), null = без фильтра по жанру.
+     * Все остальные параметры опциональны.
+     */
+    public List<FilmDto> discoverByFilters(String genreName, Integer yearFrom, Integer yearTo,
+                                            Double ratingFrom, int page) {
+        Integer genreId = (genreName != null && !genreName.isBlank())
+                ? resolveGenreIdByName(genreName) : null;
+        return convertSearch(client.getFilmsByFilters(genreId, yearFrom, yearTo, ratingFrom, page));
+    }
+
+    /**
      * Рекомендации по топ жанрам из истории просмотров.
      * Аналог TmdbService.getRecommendationsByGenreIds().
      */

@@ -263,6 +263,37 @@ public class KinopoiskClient {
         }
     }
 
+    /**
+     * GET /api/v2.2/films с фильтрами по жанру, году и рейтингу.
+     * Все параметры опциональны.
+     */
+    public KpSearchResponse getFilmsByFilters(Integer genreId, Integer yearFrom, Integer yearTo,
+                                               Double ratingFrom, int page) {
+        try {
+            return webClient.get()
+                    .uri(u -> {
+                        var b = u.path("/api/v2.2/films")
+                                .queryParam("order", "RATING")
+                                .queryParam("type", "FILM")
+                                .queryParam("page", page);
+                        if (genreId   != null) b = b.queryParam("genres",      genreId);
+                        if (yearFrom  != null) b = b.queryParam("yearFrom",    yearFrom);
+                        if (yearTo    != null) b = b.queryParam("yearTo",      yearTo);
+                        if (ratingFrom != null) b = b.queryParam("ratingFrom", ratingFrom.intValue());
+                        return b.build();
+                    })
+                    .retrieve()
+                    .bodyToMono(KpSearchResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("KP getFilmsByFilters error: {} {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return emptySearch();
+        } catch (Exception e) {
+            log.error("KP getFilmsByFilters unexpected error", e);
+            return emptySearch();
+        }
+    }
+
     // ──────────────────────────────────────────────────────────
     // Жанры
     // ──────────────────────────────────────────────────────────
