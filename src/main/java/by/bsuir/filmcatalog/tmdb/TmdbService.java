@@ -1,9 +1,7 @@
 package by.bsuir.filmcatalog.tmdb;
 
 import by.bsuir.filmcatalog.dto.FilmDto;
-import by.bsuir.filmcatalog.dto.tmdb.TmdbGenreDto;
-import by.bsuir.filmcatalog.dto.tmdb.TmdbMovieDto;
-import by.bsuir.filmcatalog.dto.tmdb.TmdbPageResponse;
+import by.bsuir.filmcatalog.dto.tmdb.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -97,6 +95,87 @@ public class TmdbService {
                 })
                 .sorted((a, b) -> a.getName().compareTo(b.getName()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Поиск фильмов по режиссёру.
+     *
+     * Алгоритм:
+     *   1. /search/person?query=name — находим персону с ролью Directing
+     *   2. /discover/movie?with_crew={personId} — берём его фильмографию
+     *
+     * @param name   имя режиссёра (ru или en)
+     * @return список фильмов, пустой если режиссёр не найден
+     */
+    public List<FilmDto> searchByDirector(String name) {
+        if (name == null || name.isBlank()) return Collections.emptyList();
+        if (genreCache.isEmpty()) warmupGenreCache();
+
+        TmdbPersonPageResponse persons = client.searchPersons(name);
+        if (persons == null || persons.getResults() == null || persons.getResults().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Берём первого режиссёра (или первого Directing если есть)
+        TmdbPersonDto director = persons.getResults().stream()
+                .filter(p -> "Directing".equalsIgnoreCase(p.getKnownForDepartment()))
+                .findFirst()
+                .orElse(persons.getResults().get(0));
+
+        // Берём две страницы фильмов данного режиссёра
+        List<FilmDto> p1 = convertList(client.discoverByDirector(director.getId(), 1));
+        List<FilmDto> p2 = convertList(client.discoverByDirector(director.getId(), 2));
+
+        java.util.Set<Long> seen = new java.util.LinkedHashSet<>();
+        List<FilmDto> result = new java.util.ArrayList<>();
+        for (FilmDto f : p1) { if (seen.add(f.getTmdbId())) result.add(f); }
+        for (FilmDto f : p2) { if (f.getTmdbId() != null && seen.add(f.getTmdbId())) result.add(f); }
+
+        // Записываем имя режиссёра в director целевым возвращаемым FilmDto
+        result.forEach(f -> f.setDirector(director.getName()));
+        return result;
+    }
+
+    /**
+     * Поиск фильмов по ключевому слову в описании.
+     *
+     * Алгоритм:
+     *   1. /search/keyword?query=word — находим соответствующий keyword_id
+     *   2. /discover/movie?with_keywords={keywordId} — фильмы с этим тегом
+     *   3. Если keyword не найден — fallback через /search/movie (TMDb также ищет в overview)
+     *
+     * @param keyword  слово/фраза (напр. «робот», «space war»)
+     * @return список фильмов
+     */
+    public List<FilmDto> searchByKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) return Collections.emptyList();
+        if (genreCache.isEmpty()) warmupGenreCache();
+
+        TmdbKeywordPageResponse kwResp = client.searchKeywords(keyword);
+        List<TmdbKeywordDto> keywords = kwResp != null ? kwResp.getResults() : Collections.emptyList();
+
+        if (!keywords.isEmpty()) {
+            // Используем первые 3 keyword идентификатора через | для большего покрытия
+            String keywordIds = keywords.stream()
+                    .limit(3)
+                    .map(k -> String.valueOf(k.getId()))
+                    .collect(Collectors.joining("|"));
+
+            // Discover c with_keywords — ор (|) находит фильмы хотя бы с одним из ключей
+            // Берём две страницы чтобы было достаточно результатов
+            try {
+                List<FilmDto> r1 = convertList(webClientDiscoverByKeywordIds(keywordIds, 1));
+                List<FilmDto> r2 = convertList(webClientDiscoverByKeywordIds(keywordIds, 2));
+                java.util.Set<Long> seen = new java.util.LinkedHashSet<>();
+                List<FilmDto> merged = new java.util.ArrayList<>();
+                for (FilmDto f : r1) { if (seen.add(f.getTmdbId())) merged.add(f); }
+                for (FilmDto f : r2) { if (f.getTmdbId() != null && seen.add(f.getTmdbId())) merged.add(f); }
+                if (!merged.isEmpty()) return merged;
+            } catch (Exception ignored) {}
+        }
+
+        // Fallback: /search/movie — TMDb также ищет в overview
+        return search(keyword, 1);
     }
 
     /**
@@ -287,6 +366,37 @@ public class TmdbService {
         return response.getResults().stream()
                 .map(this::toFilmDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Discover с несколькими keyword_id через | (ор-логика).
+     * TmdbClient принимает Long, поэтому делаем запрос напрямую.
+     */
+    private TmdbPageResponse webClientDiscoverByKeywordIds(String keywordIds, int page) {
+        // Если один keyword_id — передаём в Long-метод
+        if (!keywordIds.contains("|")) {
+            try {
+                return client.discoverByKeyword(Long.parseLong(keywordIds), page);
+            } catch (NumberFormatException e) {
+                return new TmdbPageResponse();
+            }
+        }
+        // Несколько ключей — запрашиваем подряд для каждого и мерджим
+        java.util.Set<Long> seen = new java.util.LinkedHashSet<>();
+        List<TmdbMovieDto> allMovies = new java.util.ArrayList<>();
+        for (String idStr : keywordIds.split("\\|")) {
+            try {
+                TmdbPageResponse r = client.discoverByKeyword(Long.parseLong(idStr.trim()), page);
+                if (r != null && r.getResults() != null) {
+                    for (TmdbMovieDto m : r.getResults()) {
+                        if (m.getId() != null && seen.add(m.getId())) allMovies.add(m);
+                    }
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        TmdbPageResponse merged = new TmdbPageResponse();
+        merged.setResults(allMovies);
+        return merged;
     }
 
     /** Запрашивает список жанров у TMDb и заполняет кэш. */
