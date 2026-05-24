@@ -318,15 +318,13 @@ let searchMode = 'title';
 /** Плейсхолдеры для каждого режима */
 const SEARCH_PLACEHOLDERS = {
     title:    'Введите название фильма...',
-    director: 'Имя режиссёра (напр. Нолан, Кубрик...)',
-    keyword:  'Тема / описание (напр. робот, война, космос...)'
+    director: 'Имя режиссёра (напр. Нолан, Кубрик...)'
 };
 
 /** Префиксы для строки результатов */
 const SEARCH_MODE_LABELS = {
     title:    'Поиск по названию:',
-    director: 'Поиск по режиссёру:',
-    keyword:  'Поиск по описанию:'
+    director: 'Поиск по режиссёру:'
 };
 
 function setSearchMode(mode, btn) {
@@ -379,10 +377,6 @@ async function performSearch(query, mode) {
         if (mode === 'director') {
             // Поиск по режиссёру: /search/person → /discover?with_crew
             films = await apiFetch(`${API_TMDB}/search/director?q=${encodeURIComponent(query)}`);
-
-        } else if (mode === 'keyword') {
-            // Поиск по описанию/тематике: /search/keyword → /discover?with_keywords
-            films = await apiFetch(`${API_TMDB}/search/keyword?q=${encodeURIComponent(query)}`);
 
         } else {
             // Поиск по названию: две страницы параллельно
