@@ -13,6 +13,9 @@ let currentView  = 'grid';
 let isLoading    = false;
 let previousPage = 'catalog'; // откуда пришли на страницу деталей
 
+// Текущий открытый фильм (для onclick в деталях — не передаём JSON через атрибут)
+let currentFilm  = null;
+
 // Жанры TMDb (id → name), заполняется при loadFilters()
 let genreMap = {};
 
@@ -462,6 +465,7 @@ async function openFilmDetails(filmId) {
 }
 
 async function renderFilmDetails(film, recommendations, tmdbId) {
+    currentFilm = film; // сохраняем глобально для onclick
     const posterSrc = film.posterUrl || '';
     const recHtml = (recommendations || []).length > 0
         ? recommendations.slice(0, 6).map(r => filmCardHtml(r)).join('')
@@ -500,7 +504,7 @@ async function renderFilmDetails(film, recommendations, tmdbId) {
             <div class="d-flex flex-wrap gap-3 align-items-center">
                 <select class="form-select form-select-sm status-select" style="width:auto"
                         ${filmDataAttr}
-                        onchange="setFilmStatusUnified(this, ${escapeHtml(JSON.stringify(film))})">
+                        onchange="setFilmStatusUnified(this, currentFilm)">
                     <option value="">— Статус —</option>
                     ${statusOptions.map(o =>
                         `<option value="${o.value}" ${userStatus === o.value ? 'selected' : ''}>${o.label}</option>`
@@ -510,7 +514,7 @@ async function renderFilmDetails(film, recommendations, tmdbId) {
                     ${[1,2,3,4,5,6,7,8,9,10].map(s => `
                         <i class="bi bi-star${s <= userStars ? '-fill' : ''} star-icon"
                            data-val="${s}"
-                           onclick="setUserRatingUnified(${s}, this, ${escapeHtml(JSON.stringify(film))})"
+                           onclick="setUserRatingUnified(${s}, this, currentFilm)"
                            title="${s} из 10"></i>
                     `).join('')}
                     ${userStars > 0 ? `<span class="star-label">${userStars}/10</span>` : ''}
@@ -646,7 +650,7 @@ function renderFilms(films, containerId) {
 function filmCardHtml(film, index = 0) {
     const delay = Math.min(index * 20, 400);
     const rating = film.rating ? film.rating.toFixed(1) : null;
-    const posterSrc = film.posterUrl || '';
+    const posterSrc = proxyPoster(film.posterUrl);
     const clickHandler = film.tmdbId
         ? `openTmdbFilmDetails(${film.tmdbId})`
         : `openFilmDetails(${film.id})`;
@@ -675,7 +679,7 @@ function filmCardHtml(film, index = 0) {
 
 function filmCardListHtml(film) {
     const rating = film.rating ? film.rating.toFixed(1) : '—';
-    const posterSrc = film.posterUrl || '';
+    const posterSrc = proxyPoster(film.posterUrl);
     const clickHandler = film.tmdbId
         ? `openTmdbFilmDetails(${film.tmdbId})`
         : `openFilmDetails(${film.id})`;
@@ -790,6 +794,15 @@ function generateStarsFull(rating) {
     if (!rating) return '☆☆☆☆☆';
     const full = Math.round(rating / 2);
     return '★'.repeat(Math.min(full, 5)) + '☆'.repeat(Math.max(0, 5 - full));
+}
+
+/** Проксируем постеры TMDb через сервер — работает даже если TMDb заблокирован у пользователя */
+function proxyPoster(url) {
+    if (!url) return '';
+    if (url.startsWith('https://image.tmdb.org/')) {
+        return '/api/image-proxy?url=' + encodeURIComponent(url);
+    }
+    return url;
 }
 
 function escapeHtml(str) {

@@ -70,6 +70,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/films", "/api/films/**").permitAll()
                 // TMDb эндпоинты публичны — фильмы из внешнего API
                 .requestMatchers(HttpMethod.GET, "/api/tmdb/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/image-proxy").permitAll()
                 .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
                 // Всё остальное — только авторизованным
                 .anyRequest().authenticated()
