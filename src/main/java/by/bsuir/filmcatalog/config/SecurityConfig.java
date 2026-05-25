@@ -1,6 +1,7 @@
 package by.bsuir.filmcatalog.config;
 
 import by.bsuir.filmcatalog.security.JwtAuthFilter;
+import by.bsuir.filmcatalog.service.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,17 +17,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import by.bsuir.filmcatalog.service.UserDetailsServiceImpl;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-/**
- * Конфигурация Spring Security.
- * Stateless (JWT), без сессий и CSRF.
- */
+// Конфигурация Spring Security.
+// Используем JWT вместо сессий, поэтому CSRF и сессии отключены.
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -37,6 +35,7 @@ public class SecurityConfig {
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
+    // Шифрование паролей через BCrypt
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -55,24 +54,21 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+    // Правила доступа к эндпоинтам
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Отключаем CSRF — мы используем JWT, не cookie-сессии
             .csrf(AbstractHttpConfigurer::disable)
-            // CORS — разрешаем все источники (для разработки)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            // Без сессий
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Публичные эндпоинты — доступны всем
+                // открытые эндпоинты — доступны без токена
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/films", "/api/films/**").permitAll()
-                // TMDb эндпоинты публичны — фильмы из внешнего API
                 .requestMatchers(HttpMethod.GET, "/api/tmdb/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/image-proxy").permitAll()
                 .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
-                // Всё остальное — только авторизованным
+                // остальное только авторизованным
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authProvider())
@@ -81,6 +77,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Разрешаем запросы с любого источника (нужно для разработки с ngrok)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

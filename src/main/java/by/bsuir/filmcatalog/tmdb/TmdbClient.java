@@ -11,15 +11,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Низкоуровневый HTTP-клиент для TMDb API v3.
- *
- * Все запросы выполняются синхронно (.block()), поскольку
- * остальной проект не использует реактивный подход.
- *
- * Ключ передаётся как Bearer token в заголовке Authorization
- * (TMDb рекомендует именно этот способ для v3).
- */
+// HTTP клиент для работы с TMDb API.
+// Запросы синхронные (.block()), токен передаётся в заголовке Authorization.
 @Component
 public class TmdbClient {
 
@@ -32,8 +25,7 @@ public class TmdbClient {
 
     public TmdbClient(
             @Value("${tmdb.api.base-url}") String baseUrl,
-            @Value("${tmdb.api.token}") String token
-    ) {
+            @Value("${tmdb.api.token}") String token) {
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + token)
@@ -41,13 +33,7 @@ public class TmdbClient {
                 .build();
     }
 
-    // ========================
-    // Популярные фильмы
-    // ========================
-
-    /**
-     * GET /movie/popular?language=ru-RU&page=1
-     */
+    // GET /movie/popular
     public TmdbPageResponse getPopularMovies(int page) {
         try {
             return webClient.get()
@@ -59,22 +45,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb getPopularMovies error: {} {}", e.getStatusCode(), e.getMessage());
+            log.error("TMDb getPopularMovies: {} {}", e.getStatusCode(), e.getMessage());
             return emptyPage();
         } catch (Exception e) {
-            log.error("TMDb getPopularMovies unexpected error", e);
+            log.error("TMDb getPopularMovies error", e);
             return emptyPage();
         }
     }
 
-    // ========================
-    // Топ фильмов по рейтингу
-    // ========================
-
-    /**
-     * GET /movie/top_rated?language=ru-RU&page=1
-     * Фильмы с наивысшим рейтингом TMDb.
-     */
+    // GET /movie/top_rated
     public TmdbPageResponse getTopRatedMovies(int page) {
         try {
             return webClient.get()
@@ -86,21 +65,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb getTopRatedMovies error: {} {}", e.getStatusCode(), e.getMessage());
+            log.error("TMDb getTopRatedMovies: {} {}", e.getStatusCode(), e.getMessage());
             return emptyPage();
         } catch (Exception e) {
-            log.error("TMDb getTopRatedMovies unexpected error", e);
+            log.error("TMDb getTopRatedMovies error", e);
             return emptyPage();
         }
     }
 
-    // ========================
-    // Поиск фильмов
-    // ========================
-
-    /**
-     * GET /search/movie?query=...&language=ru-RU&page=1
-     */
+    // GET /search/movie?query=...
     public TmdbPageResponse searchMovies(String query, int page) {
         try {
             return webClient.get()
@@ -113,22 +86,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb searchMovies error: {} {}", e.getStatusCode(), e.getMessage());
+            log.error("TMDb searchMovies: {} {}", e.getStatusCode(), e.getMessage());
             return emptyPage();
         } catch (Exception e) {
-            log.error("TMDb searchMovies unexpected error", e);
+            log.error("TMDb searchMovies error", e);
             return emptyPage();
         }
     }
 
-    // ========================
-    // Детали фильма
-    // ========================
-
-    /**
-     * GET /movie/{id}?language=ru-RU&append_to_response=credits
-     * append_to_response=credits позволяет за один запрос получить и режиссёра.
-     */
+    // GET /movie/{id}?append_to_response=credits
     public TmdbMovieDto getMovieDetails(Long tmdbId) {
         try {
             return webClient.get()
@@ -140,21 +106,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbMovieDto.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb getMovieDetails({}) error: {} {}", tmdbId, e.getStatusCode(), e.getMessage());
+            log.error("TMDb getMovieDetails({}): {} {}", tmdbId, e.getStatusCode(), e.getMessage());
             return null;
         } catch (Exception e) {
-            log.error("TMDb getMovieDetails unexpected error", e);
+            log.error("TMDb getMovieDetails error", e);
             return null;
         }
     }
 
-    // ========================
-    // Список жанров
-    // ========================
-
-    /**
-     * GET /genre/movie/list?language=ru-RU
-     */
+    // GET /genre/movie/list
     public List<TmdbGenreDto> getGenreList() {
         try {
             TmdbGenreListResponse response = webClient.get()
@@ -173,14 +133,7 @@ public class TmdbClient {
         }
     }
 
-    // ========================
-    // Рекомендации по фильму
-    // ========================
-
-    /**
-     * GET /movie/{id}/recommendations?language=ru-RU&page=1
-     * Используется для блока "Похожие фильмы" на странице фильма.
-     */
+    // GET /movie/{id}/recommendations — похожие фильмы
     public TmdbPageResponse getMovieRecommendations(Long tmdbId, int page) {
         try {
             return webClient.get()
@@ -192,27 +145,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb getMovieRecommendations({}) error: {}", tmdbId, e.getStatusCode());
+            log.error("TMDb getMovieRecommendations({}): {}", tmdbId, e.getStatusCode());
             return emptyPage();
         } catch (Exception e) {
-            log.error("TMDb getMovieRecommendations unexpected error", e);
+            log.error("TMDb getMovieRecommendations error", e);
             return emptyPage();
         }
     }
 
-    // ========================
-    // Фильмы по жанру (для рекомендаций)
-    // ========================
-
-    /**
-     * GET /discover/movie — универсальный Discover с фильтрами.
-     *
-     * @param genreId        ID жанра в TMDb (nullable — если null, жанр не фильтруется)
-     * @param yearFrom       мин. год выхода (nullable)
-     * @param yearTo         макс. год выхода (nullable)
-     * @param voteAverageGte мин. рейтинг (nullable)
-     * @param page           страница (1-500)
-     */
+    // GET /discover/movie — универсальная фильтрация фильмов
     public TmdbPageResponse discover(Integer genreId, Integer yearFrom, Integer yearTo,
                                      Double voteAverageGte, int page) {
         try {
@@ -221,9 +162,8 @@ public class TmdbClient {
                         var b = u.path("/discover/movie")
                                 .queryParam("language", language)
                                 .queryParam("page", page);
-                        // vote_count.gte:
-                        //  - фильтр рейтинга 9+ → 50 голосов (новые фильмы 2025-2026 попадают)
-                        //  - без фильтра рейтинга → 200 голосов (качественные результаты)
+
+                        // Порог голосов зависит от фильтра рейтинга
                         if (voteAverageGte != null && voteAverageGte >= 8.5) {
                             b = b.queryParam("vote_count.gte", "50")
                                  .queryParam("sort_by", "vote_average.desc");
@@ -231,38 +171,29 @@ public class TmdbClient {
                             b = b.queryParam("vote_count.gte", "200")
                                  .queryParam("sort_by", "vote_average.desc");
                         }
-                        if (genreId != null)        b = b.queryParam("with_genres", genreId);
-                        if (yearFrom != null)        b = b.queryParam("primary_release_date.gte", yearFrom + "-01-01");
-                        if (yearTo   != null)        b = b.queryParam("primary_release_date.lte", yearTo   + "-12-31");
-                        if (voteAverageGte != null)  b = b.queryParam("vote_average.gte", voteAverageGte);
+
+                        if (genreId != null)       b = b.queryParam("with_genres", genreId);
+                        if (yearFrom != null)       b = b.queryParam("primary_release_date.gte", yearFrom + "-01-01");
+                        if (yearTo != null)         b = b.queryParam("primary_release_date.lte", yearTo + "-12-31");
+                        if (voteAverageGte != null) b = b.queryParam("vote_average.gte", voteAverageGte);
+
                         return b.build();
                     })
                     .retrieve()
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (Exception e) {
-            log.error("TMDb discover error (genre={}, yearFrom={}, yearTo={}, rating={})",
-                    genreId, yearFrom, yearTo, voteAverageGte, e);
+            log.error("TMDb discover error", e);
             return emptyPage();
         }
     }
 
-    /**
-     * Устаревший метод — оставлен для совместимости с UserFilmService.
-     * Используй discover() напрямую.
-     */
+    // Обёртка для совместимости со старым кодом
     public TmdbPageResponse discoverByGenre(Integer genreId, int page) {
         return discover(genreId, null, null, null, page);
     }
 
-    // ========================
-    // Поиск персоны (режиссёр)
-    // ========================
-
-    /**
-     * GET /search/person?query=...&language=ru-RU
-     * Находит людей (режиссёров, актёров) по имени.
-     */
+    // GET /search/person?query=...
     public TmdbPersonPageResponse searchPersons(String query) {
         try {
             return webClient.get()
@@ -274,18 +205,15 @@ public class TmdbClient {
                     .bodyToMono(TmdbPersonPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb searchPersons error: {} {}", e.getStatusCode(), e.getMessage());
+            log.error("TMDb searchPersons: {} {}", e.getStatusCode(), e.getMessage());
             return emptyPersonPage();
         } catch (Exception e) {
-            log.error("TMDb searchPersons unexpected error", e);
+            log.error("TMDb searchPersons error", e);
             return emptyPersonPage();
         }
     }
 
-    /**
-     * GET /discover/movie?with_crew={personId} — фильмы режиссёра по его person_id.
-     * sort_by=vote_count.desc — чтобы первыми шли самые известные фильмы.
-     */
+    // GET /discover/movie?with_crew={personId} — фильмы конкретного режиссёра
     public TmdbPageResponse discoverByDirector(Long personId, int page) {
         try {
             return webClient.get()
@@ -299,17 +227,13 @@ public class TmdbClient {
                     .bodyToMono(TmdbPageResponse.class)
                     .block();
         } catch (WebClientResponseException e) {
-            log.error("TMDb discoverByDirector({}) error: {}", personId, e.getStatusCode());
+            log.error("TMDb discoverByDirector({}): {}", personId, e.getStatusCode());
             return emptyPage();
         } catch (Exception e) {
-            log.error("TMDb discoverByDirector unexpected error", e);
+            log.error("TMDb discoverByDirector error", e);
             return emptyPage();
         }
     }
-
-    // ========================
-    // Вспомогательные
-    // ========================
 
     private TmdbPageResponse emptyPage() {
         TmdbPageResponse r = new TmdbPageResponse();
@@ -326,5 +250,4 @@ public class TmdbClient {
         r.setTotalResults(0);
         return r;
     }
-
 }

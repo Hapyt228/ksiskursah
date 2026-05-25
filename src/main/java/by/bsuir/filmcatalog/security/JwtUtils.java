@@ -10,27 +10,15 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.UUID;
 
-/**
- * Утилита для работы с JWT.
- *
- * Access token:
- *   - Подписанный HS256 JWT
- *   - Живёт 15 минут
- *   - Содержит username и userId в claims
- *
- * Refresh token:
- *   - Случайный UUID (хранится в БД, не является JWT)
- *   - Живёт 7 дней
- *   - При logout — отзывается (revoked=true)
- */
+// Утилита для работы с JWT токенами.
+// Access token живёт 15 минут, refresh token — случайный UUID, хранится в БД.
 @Component
 public class JwtUtils {
 
-    /** Секретный ключ — минимум 256 бит, задаётся в application.properties */
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    /** Время жизни access token в миллисекундах (15 мин = 900_000) */
+    // Время жизни access token (15 минут по умолчанию)
     @Value("${app.jwt.access-expiration-ms:900000}")
     private long accessExpirationMs;
 
@@ -39,15 +27,9 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // ========================
-    // Access Token
-    // ========================
-
-    /**
-     * Генерирует access token для пользователя.
-     */
+    // Создаём JWT с именем пользователя и его id
     public String generateAccessToken(String username, Long userId) {
-        Date now    = new Date();
+        Date now = new Date();
         Date expiry = new Date(now.getTime() + accessExpirationMs);
 
         return Jwts.builder()
@@ -59,23 +41,15 @@ public class JwtUtils {
                 .compact();
     }
 
-    /**
-     * Извлекает username из access token.
-     */
     public String getUsernameFromToken(String token) {
         return parseClaims(token).getSubject();
     }
 
-    /**
-     * Извлекает userId из access token.
-     */
     public Long getUserIdFromToken(String token) {
         return parseClaims(token).get("userId", Long.class);
     }
 
-    /**
-     * Проверяет подпись и срок действия access token.
-     */
+    // Проверяем подпись и срок действия токена
     public boolean validateToken(String token) {
         try {
             parseClaims(token);
@@ -93,14 +67,7 @@ public class JwtUtils {
                 .getPayload();
     }
 
-    // ========================
-    // Refresh Token
-    // ========================
-
-    /**
-     * Генерирует случайный UUID для refresh token.
-     * Сам токен хранится в таблице refresh_tokens.
-     */
+    // Refresh token — просто UUID, хранится в таблице refresh_tokens
     public String generateRefreshToken() {
         return UUID.randomUUID().toString();
     }

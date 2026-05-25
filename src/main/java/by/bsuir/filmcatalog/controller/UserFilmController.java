@@ -8,23 +8,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.NoSuchElementException;
-
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
-/**
- * REST-контроллер для пользовательского взаимодействия с фильмами.
- *
- * POST   /api/user/films/{id}/view          — записать просмотр
- * PUT    /api/user/films/{id}/status        — поставить статус
- * DELETE /api/user/films/{id}/status        — снять статус
- * GET    /api/user/films/{id}/status        — получить статус
- * PUT    /api/user/films/{id}/rating        — поставить оценку (1-5★)
- * GET    /api/user/films/{id}/rating        — моя оценка
- * GET    /api/user/recommendations          — рекомендации для главной страницы
- * GET    /api/user/history                  — история просмотров
- */
+// Контроллер для пользовательских действий с фильмами:
+// просмотры, статусы, оценки, рекомендации, история
 @RestController
 @RequestMapping("/api/user")
 @CrossOrigin(origins = "*")
@@ -33,30 +22,14 @@ public class UserFilmController {
     @Autowired
     private UserFilmService userFilmService;
 
-    // ========================
-    // История просмотров
-    // ========================
-
-    /**
-     * Записывает просмотр локального фильма по локальному id.
-     * Вызывается фронтендом при открытии страницы детального просмотра (local film).
-     *
-     * Response: { "recorded": true }
-     */
+    // Записать просмотр локального фильма
     @PostMapping("/films/{id}/view")
     public ResponseEntity<?> recordView(@PathVariable Long id, Authentication auth) {
         userFilmService.recordView(auth.getName(), id);
         return ResponseEntity.ok(Map.of("recorded", true));
     }
 
-    /**
-     * Записывает просмотр TMDb-фильма по tmdbId.
-     * Фильм автоматически сохраняется в локальную БД (если ещё не сохранён).
-     *
-     * POST /api/user/tmdb/{tmdbId}/view
-     * Body (optional): { "title": "...", "genre": "...", ... }  — данные для сохранения
-     * Response: { "recorded": true, "localId": 42 }
-     */
+    // Записать просмотр TMDb фильма (фильм автоматически сохраняется в БД)
     @PostMapping("/tmdb/{tmdbId}/view")
     public ResponseEntity<?> recordTmdbView(
             @PathVariable Long tmdbId,
@@ -70,13 +43,7 @@ public class UserFilmController {
         }
     }
 
-    /**
-     * Установить статус TMDb-фильма по tmdbId.
-     * Фильм автоматически сохраняется в локальную БД (если ещё не сохранён).
-     *
-     * PUT /api/user/tmdb/{tmdbId}/status
-     * Body: { "status": "FAVOURITE", "filmData": { "title": "...", ... } }
-     */
+    // Установить статус TMDb фильма
     @PutMapping("/tmdb/{tmdbId}/status")
     public ResponseEntity<?> setTmdbStatus(
             @PathVariable Long tmdbId,
@@ -96,31 +63,21 @@ public class UserFilmController {
         }
     }
 
-    /**
-     * Получить статус TMDb-фильма.
-     * GET /api/user/tmdb/{tmdbId}/status
-     */
+    // Получить статус TMDb фильма
     @GetMapping("/tmdb/{tmdbId}/status")
     public ResponseEntity<?> getTmdbStatus(@PathVariable Long tmdbId, Authentication auth) {
         String status = userFilmService.getStatusByTmdbId(auth.getName(), tmdbId).orElse("");
         return ResponseEntity.ok(Map.of("status", status));
     }
 
-    /**
-     * Убрать статус TMDb-фильма.
-     * DELETE /api/user/tmdb/{tmdbId}/status
-     */
+    // Убрать статус TMDb фильма
     @DeleteMapping("/tmdb/{tmdbId}/status")
     public ResponseEntity<?> removeTmdbStatus(@PathVariable Long tmdbId, Authentication auth) {
         userFilmService.removeStatusByTmdbId(auth.getName(), tmdbId);
         return ResponseEntity.ok(Map.of("removed", true));
     }
 
-    /**
-     * Поставить оценку TMDb-фильму.
-     * PUT /api/user/tmdb/{tmdbId}/rating
-     * Body: { "stars": 5, "filmData": { "title": "...", ... } }
-     */
+    // Поставить оценку TMDb фильму
     @PutMapping("/tmdb/{tmdbId}/rating")
     public ResponseEntity<?> rateTmdbFilm(
             @PathVariable Long tmdbId,
@@ -135,17 +92,80 @@ public class UserFilmController {
         return ResponseEntity.ok(Map.of("stars", stars, "localId", localId));
     }
 
-    /**
-     * Получить оценку TMDb-фильма.
-     * GET /api/user/tmdb/{tmdbId}/rating
-     */
+    // Получить оценку TMDb фильма
     @GetMapping("/tmdb/{tmdbId}/rating")
     public ResponseEntity<?> getTmdbRating(@PathVariable Long tmdbId, Authentication auth) {
         Integer stars = userFilmService.getRatingByTmdbId(auth.getName(), tmdbId).orElse(0);
         return ResponseEntity.ok(Map.of("stars", stars));
     }
 
-    // Вспомогательный: извлекает filmData из тела запроса (для автосохранения фильма)
+    // Установить статус локального фильма
+    @PutMapping("/films/{id}/status")
+    public ResponseEntity<?> setStatus(@PathVariable Long id,
+                                       @RequestBody Map<String, String> body,
+                                       Authentication auth) {
+        String statusStr = body.get("status");
+        if (statusStr == null || statusStr.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Поле status обязательно"));
+        }
+        try {
+            MovieUserStatus.WatchStatus status = MovieUserStatus.WatchStatus.valueOf(statusStr.toUpperCase());
+            userFilmService.setStatus(auth.getName(), id, status);
+            return ResponseEntity.ok(Map.of("status", status.name()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Недопустимый статус: " + statusStr));
+        }
+    }
+
+    // Получить статус локального фильма
+    @GetMapping("/films/{id}/status")
+    public ResponseEntity<?> getStatus(@PathVariable Long id, Authentication auth) {
+        String status = userFilmService.getStatus(auth.getName(), id).orElse(null);
+        return ResponseEntity.ok(Map.of("status", status != null ? status : ""));
+    }
+
+    // Убрать статус
+    @DeleteMapping("/films/{id}/status")
+    public ResponseEntity<?> removeStatus(@PathVariable Long id, Authentication auth) {
+        userFilmService.removeStatus(auth.getName(), id);
+        return ResponseEntity.ok(Map.of("removed", true));
+    }
+
+    // Поставить оценку локальному фильму
+    @PutMapping("/films/{id}/rating")
+    public ResponseEntity<?> rateFilm(@PathVariable Long id,
+                                      @RequestBody Map<String, Integer> body,
+                                      Authentication auth) {
+        Integer stars = body.get("stars");
+        if (stars == null || stars < 1 || stars > 10) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 10"));
+        }
+        userFilmService.rateFilm(auth.getName(), id, stars);
+        return ResponseEntity.ok(Map.of("stars", stars));
+    }
+
+    // Получить свою оценку фильма
+    @GetMapping("/films/{id}/rating")
+    public ResponseEntity<?> getUserRating(@PathVariable Long id, Authentication auth) {
+        Integer stars = userFilmService.getUserRating(auth.getName(), id).orElse(null);
+        return ResponseEntity.ok(Map.of("stars", stars != null ? stars : 0));
+    }
+
+    // История просмотров
+    @GetMapping("/history")
+    public ResponseEntity<List<FilmDto>> getHistory(Authentication auth) {
+        return ResponseEntity.ok(userFilmService.getViewHistory(auth.getName()));
+    }
+
+    // Персональные рекомендации для главной страницы
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<FilmDto>> getRecommendations(
+            @RequestParam(defaultValue = "12") int limit,
+            Authentication auth) {
+        return ResponseEntity.ok(userFilmService.getRecommendations(auth.getName(), limit));
+    }
+
+    // Вспомогательный метод: достаём filmData из тела запроса
     @SuppressWarnings("unchecked")
     private FilmDto extractFilmDto(Map<String, Object> body) {
         Object filmDataRaw = body.get("filmData");
@@ -168,125 +188,5 @@ public class UserFilmController {
             return dto;
         }
         return null;
-    }
-
-    /**
-     * История просмотров пользователя.
-     *
-     * Response: [ { "id": 1, "title": "...", ... }, ... ]
-     */
-    @GetMapping("/history")
-    public ResponseEntity<List<FilmDto>> getHistory(Authentication auth) {
-        return ResponseEntity.ok(userFilmService.getViewHistory(auth.getName()));
-    }
-
-    // ========================
-    // Статусы фильмов
-    // ========================
-
-    /**
-     * Устанавливает статус фильма.
-     *
-     * Request:  { "status": "FAVOURITE" }
-     * Response: { "status": "FAVOURITE" }
-     *
-     * Допустимые значения status:
-     *   WATCHING, PLANNED, DROPPED, COMPLETED, FAVOURITE, REWATCHING, POSTPONED
-     */
-    @PutMapping("/films/{id}/status")
-    public ResponseEntity<?> setStatus(@PathVariable Long id,
-                                       @RequestBody Map<String, String> body,
-                                       Authentication auth) {
-        String statusStr = body.get("status");
-        if (statusStr == null || statusStr.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Поле status обязательно"));
-        }
-        try {
-            MovieUserStatus.WatchStatus status = MovieUserStatus.WatchStatus.valueOf(statusStr.toUpperCase());
-            userFilmService.setStatus(auth.getName(), id, status);
-            return ResponseEntity.ok(Map.of("status", status.name()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Недопустимый статус: " + statusStr));
-        }
-    }
-
-    /**
-     * Получить текущий статус фильма у пользователя.
-     *
-     * Response: { "status": "FAVOURITE" } или { "status": null }
-     */
-    @GetMapping("/films/{id}/status")
-    public ResponseEntity<?> getStatus(@PathVariable Long id, Authentication auth) {
-        String status = userFilmService.getStatus(auth.getName(), id).orElse(null);
-        return ResponseEntity.ok(Map.of("status", status != null ? status : ""));
-    }
-
-    /**
-     * Убрать статус фильма.
-     */
-    @DeleteMapping("/films/{id}/status")
-    public ResponseEntity<?> removeStatus(@PathVariable Long id, Authentication auth) {
-        userFilmService.removeStatus(auth.getName(), id);
-        return ResponseEntity.ok(Map.of("removed", true));
-    }
-
-    // ========================
-    // Оценки фильмов
-    // ========================
-
-    /**
-     * Поставить или обновить оценку фильму (1-5 звёзд).
-     *
-     * Request:  { "stars": 5 }
-     * Response: { "stars": 5 }
-     */
-    @PutMapping("/films/{id}/rating")
-    public ResponseEntity<?> rateFilm(@PathVariable Long id,
-                                      @RequestBody Map<String, Integer> body,
-                                      Authentication auth) {
-        Integer stars = body.get("stars");
-        if (stars == null || stars < 1 || stars > 10) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Оценка должна быть от 1 до 10"));
-        }
-        userFilmService.rateFilm(auth.getName(), id, stars);
-        return ResponseEntity.ok(Map.of("stars", stars));
-    }
-
-    /**
-     * Получить свою оценку фильма.
-     *
-     * Response: { "stars": 4 } или { "stars": null }
-     */
-    @GetMapping("/films/{id}/rating")
-    public ResponseEntity<?> getUserRating(@PathVariable Long id, Authentication auth) {
-        Integer stars = userFilmService.getUserRating(auth.getName(), id).orElse(null);
-        return ResponseEntity.ok(Map.of("stars", stars != null ? stars : 0));
-    }
-
-    // ========================
-    // Рекомендации
-    // ========================
-
-    /**
-     * Рекомендации для главной страницы.
-     * Алгоритм с весовыми коэффициентами (см. UserFilmService).
-     *
-     * GET /api/user/recommendations?limit=12
-     *
-     * Response:
-     * [
-     *   {
-     *     "id": 5, "title": "Интерстеллар", "genre": "Фантастика",
-     *     "rating": 8.6, "year": 2014, ...
-     *   },
-     *   ...
-     * ]
-     */
-    @GetMapping("/recommendations")
-    public ResponseEntity<List<FilmDto>> getRecommendations(
-            @RequestParam(defaultValue = "12") int limit,
-            Authentication auth) {
-        List<FilmDto> recommendations = userFilmService.getRecommendations(auth.getName(), limit);
-        return ResponseEntity.ok(recommendations);
     }
 }
