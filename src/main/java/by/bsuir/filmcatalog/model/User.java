@@ -45,7 +45,7 @@ public class User {
     @Column(nullable = false)
     private boolean enabled = true;
 
-    /** ROLE_USER или ROLE_ADMIN */
+    // роль пользователя
     @Column(nullable = false)
     private String role = "ROLE_USER";
 
